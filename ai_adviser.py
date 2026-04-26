@@ -41,6 +41,8 @@ def _get_secret(key: str) -> str:
 
 # Keys are re-fetched at call time inside each function — module-level values
 # are only used as a fast-path check; actual API calls always call _get_secret().
+# Keys are injected by dashboard.py via _load_keys() after Streamlit starts.
+# These defaults are only used if ai_adviser is imported outside of dashboard.py.
 GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
 AV_API_KEY    = os.getenv("ALPHA_VANTAGE_API_KEY", "")
 MA_API_TOKEN  = os.getenv("MARKETAUX_API_TOKEN", "")
