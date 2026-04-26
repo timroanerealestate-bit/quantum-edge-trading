@@ -24,23 +24,49 @@ import market_data as md
 from options_analyzer import summarize_options
 
 # ─── Inject API keys from Streamlit secrets (Cloud) or .env (local) ───────────
-# dashboard.py runs inside Streamlit's context so st.secrets is always available.
-def _load_keys():
-    def _s(key: str) -> str:
-        try:
-            v = st.secrets.get(key, "")
-            if v: return v
-        except Exception:
-            pass
-        import os
-        return os.getenv(key, "")
+import os as _os_keys
 
-    adviser.GROQ_API_KEY  = _s("GROQ_API_KEY")
-    adviser.AV_API_KEY    = _s("ALPHA_VANTAGE_API_KEY")
-    adviser.MA_API_TOKEN  = _s("MARKETAUX_API_TOKEN")
-    adviser.HAS_GROQ      = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
+def _load_keys():
+    groq_key = ""
+    av_key   = ""
+    ma_key   = ""
+
+    # Try st.secrets (Streamlit Cloud dashboard)
+    try:
+        groq_key = st.secrets["GROQ_API_KEY"]
+    except Exception:
+        pass
+    try:
+        av_key = st.secrets["ALPHA_VANTAGE_API_KEY"]
+    except Exception:
+        pass
+    try:
+        ma_key = st.secrets["MARKETAUX_API_TOKEN"]
+    except Exception:
+        pass
+
+    # Fall back to .env (local)
+    if not groq_key:
+        groq_key = _os_keys.getenv("GROQ_API_KEY", "")
+    if not av_key:
+        av_key   = _os_keys.getenv("ALPHA_VANTAGE_API_KEY", "")
+    if not ma_key:
+        ma_key   = _os_keys.getenv("MARKETAUX_API_TOKEN", "")
+
+    adviser.GROQ_API_KEY  = groq_key
+    adviser.AV_API_KEY    = av_key
+    adviser.MA_API_TOKEN  = ma_key
+    adviser.HAS_GROQ      = adviser._GROQ_INSTALLED and bool(groq_key)
 
 _load_keys()
+
+# ── DEBUG: remove after confirming keys load on Cloud ─────────────────────────
+with st.sidebar:
+    with st.expander("🔑 Key Debug", expanded=False):
+        st.write("Groq installed:", adviser._GROQ_INSTALLED)
+        st.write("Groq key found:", bool(adviser.GROQ_API_KEY))
+        st.write("HAS_GROQ:", adviser.HAS_GROQ)
+        st.write("Key preview:", adviser.GROQ_API_KEY[:8] + "..." if adviser.GROQ_API_KEY else "EMPTY")
 
 # ─── CSS: Quantum Edge — Charcoal / Emerald / Purple premium theme ───────────
 st.markdown("""
