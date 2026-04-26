@@ -26,9 +26,17 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
-AV_API_KEY    = os.getenv("ALPHA_VANTAGE_API_KEY", "")
-MA_API_TOKEN  = os.getenv("MARKETAUX_API_TOKEN", "")
+def _get_secret(key: str) -> str:
+    """Read from Streamlit secrets (Cloud) with fallback to .env (local)."""
+    try:
+        import streamlit as st
+        return st.secrets.get(key, "") or os.getenv(key, "")
+    except Exception:
+        return os.getenv(key, "")
+
+GROQ_API_KEY  = _get_secret("GROQ_API_KEY")
+AV_API_KEY    = _get_secret("ALPHA_VANTAGE_API_KEY")
+MA_API_TOKEN  = _get_secret("MARKETAUX_API_TOKEN")
 GROQ_MODEL    = "llama-3.3-70b-versatile"
 
 try:
