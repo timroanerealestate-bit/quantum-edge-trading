@@ -28,22 +28,39 @@ load_dotenv()
 
 def _get_secret(key: str) -> str:
     """Read from Streamlit secrets (Cloud) with fallback to .env (local)."""
+    # Try Streamlit secrets first (works on Cloud and locally with secrets.toml)
     try:
         import streamlit as st
-        return st.secrets.get(key, "") or os.getenv(key, "")
+        val = st.secrets.get(key, "")
+        if val:
+            return val
     except Exception:
-        return os.getenv(key, "")
+        pass
+    # Fall back to environment variable (.env loaded above)
+    return os.getenv(key, "")
 
-GROQ_API_KEY  = _get_secret("GROQ_API_KEY")
-AV_API_KEY    = _get_secret("ALPHA_VANTAGE_API_KEY")
-MA_API_TOKEN  = _get_secret("MARKETAUX_API_TOKEN")
-GROQ_MODEL    = "llama-3.3-70b-versatile"
+# Keys are re-fetched at call time inside each function — module-level values
+# are only used as a fast-path check; actual API calls always call _get_secret().
+GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
+AV_API_KEY    = os.getenv("ALPHA_VANTAGE_API_KEY", "")
+MA_API_TOKEN  = os.getenv("MARKETAUX_API_TOKEN", "")
 
 try:
-    from groq import Groq
-    HAS_GROQ = bool(GROQ_API_KEY)
+    from groq import Groq as _Groq
+    _GROQ_INSTALLED = True
 except ImportError:
-    HAS_GROQ = False
+    _Groq = None
+    _GROQ_INSTALLED = False
+
+def _groq_key() -> str:
+    """Always fetch the freshest key — works both locally and on Streamlit Cloud."""
+    return _get_secret("GROQ_API_KEY")
+
+def _has_groq() -> bool:
+    return _GROQ_INSTALLED and bool(_groq_key())
+GROQ_MODEL    = "llama-3.3-70b-versatile"
+
+HAS_GROQ = _GROQ_INSTALLED  # package installed; key checked at call time
 
 
 # ── Stock universe ────────────────────────────────────────────────────────────
@@ -916,7 +933,7 @@ def ask_adviser(
     if scan_results is None:
         scan_results = []
 
-    if not HAS_GROQ:
+    if not _has_groq():
         return _rule_based_response(question, scan_results, simple_mode)
 
     # ── Full multi-layer validation (every query) ─────────────────────────────
@@ -941,7 +958,7 @@ My question: {question}{mode_tag}"""
     ]
 
     try:
-        client = Groq(api_key=GROQ_API_KEY)
+        client = _Groq(api_key=_groq_key())
 
         if stream_callback:
             full_text = ""
@@ -969,7 +986,7 @@ My question: {question}{mode_tag}"""
 
 def ask_ui_adviser(stream_callback=None) -> str:
     """UI/UX improvement analysis agent — returns proposals + embedded CSS artifact."""
-    if not HAS_GROQ:
+    if not _has_groq():
         return _ui_rule_based()
 
     messages = [
@@ -980,7 +997,7 @@ def ask_ui_adviser(stream_callback=None) -> str:
     ]
 
     try:
-        client = Groq(api_key=GROQ_API_KEY)
+        client = _Groq(api_key=_groq_key())
 
         if stream_callback:
             full_text = ""
@@ -1012,7 +1029,7 @@ def generate_ui_css(approved_titles: list[str], analysis: str,
     Called when the user approves individual items and clicks Apply.
     Returns a CSS string (without fences) ready to write to custom_ui.css.
     """
-    if not HAS_GROQ:
+    if not _has_groq():
         return "/* Groq API key required for CSS generation */"
 
     approved_str = "\n".join(f"- {t}" for t in approved_titles)
@@ -1026,7 +1043,7 @@ def generate_ui_css(approved_titles: list[str], analysis: str,
     ]
 
     try:
-        client = Groq(api_key=GROQ_API_KEY)
+        client = _Groq(api_key=_groq_key())
 
         if stream_callback:
             full_text = ""
