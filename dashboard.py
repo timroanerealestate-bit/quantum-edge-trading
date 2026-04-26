@@ -23,6 +23,25 @@ import ai_adviser as adviser
 import market_data as md
 from options_analyzer import summarize_options
 
+# ─── Inject API keys from Streamlit secrets (Cloud) or .env (local) ───────────
+# dashboard.py runs inside Streamlit's context so st.secrets is always available.
+def _load_keys():
+    def _s(key: str) -> str:
+        try:
+            v = st.secrets.get(key, "")
+            if v: return v
+        except Exception:
+            pass
+        import os
+        return os.getenv(key, "")
+
+    adviser.GROQ_API_KEY  = _s("GROQ_API_KEY")
+    adviser.AV_API_KEY    = _s("ALPHA_VANTAGE_API_KEY")
+    adviser.MA_API_TOKEN  = _s("MARKETAUX_API_TOKEN")
+    adviser.HAS_GROQ      = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
+
+_load_keys()
+
 # ─── CSS: Quantum Edge — Charcoal / Emerald / Purple premium theme ───────────
 st.markdown("""
 <style>
