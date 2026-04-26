@@ -1,0 +1,155 @@
+/* === Proposal 1: Collapsible Sidebar === */
+.stApp [data-testid="stSidebar"] {
+  width: 22%;
+  transition: width 0.2s ease-in-out;
+}
+
+.stApp [data-testid="stSidebar"].collapsed {
+  width: 5%;
+  background-color: #1a1b22;
+}
+
+.stApp [data-testid="stSidebar"] .stSidebar-toggle {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #8b56f6;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* === Proposal 2: Auto-Refresh Feature === */
+.stApp .stAutoRefresh {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: #f0f0f5;
+}
+
+.stApp .stAutoRefresh .stRefreshInterval {
+  background-color: #1a1b22;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+/* === Proposal 3: Keyboard Shortcuts === */
+.stApp .stKeyboardShortcuts {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #8b56f6;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.stApp .stKeyboardShortcuts .stShortcut {
+  animation: shortcut-animation 0.2s ease-in-out;
+}
+
+@keyframes shortcut-animation {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* === Proposal 4: Watchlist Save/Load === */
+.stApp .stWatchlistSaveLoad {
+  background-color: #1a1b22;
+  padding: 20px;
+  border: 1px solid #2f2f2f;
+}
+
+.stApp .stWatchlistSaveLoad .stSaveWatchlist {
+  background-color: #00d26a;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.stApp .stWatchlistSaveLoad .stLoadWatchlist {
+  background-color: #00d26a;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* === Proposal 5: Chart Drawing Tools === */
+.stApp .stChartDrawingTools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #8b56f6;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.stApp .stChartDrawingTools .stDrawingTool {
+  background-color: #1a1b22;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.stApp .stChartDrawingTools .stDrawingTool.emerald {
+  background-color: #00d26a;
+}
+
+.stApp .stChartDrawingTools .stDrawingTool.purple {
+  background-color: #8b56f6;
+}
+
+.stApp .stChartDrawingTools .stDrawingTool.red {
+  background-color: #ff4040;
+}
+
+/* === Proposal 6: Order Ticket Integration === */
+.stApp .stOrderTicket {
+  background-color: #1a1b22;
+  padding: 20px;
+  border: 1px solid #2f2f2f;
+}
+
+.stApp .stOrderTicket .stOrderButton {
+  background-color: #00d26a;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* === Proposal 7: Light Mode Option === */
+.stApp.light-mode {
+  background-color: #f7f7f7;
+  color: #333;
+}
+
+.stApp.light-mode .stThemeSwitcher {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: #3498db;
+  color: #fff;
+  border: none;
+  padding: 5px 10px;
+  font-size: 16px;
+  cursor: pointer;
+}
