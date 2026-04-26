@@ -933,7 +933,7 @@ def ask_adviser(
     if scan_results is None:
         scan_results = []
 
-    if not _has_groq():
+    if not HAS_GROQ or not GROQ_API_KEY:
         return _rule_based_response(question, scan_results, simple_mode)
 
     # ── Full multi-layer validation (every query) ─────────────────────────────
@@ -958,7 +958,7 @@ My question: {question}{mode_tag}"""
     ]
 
     try:
-        client = _Groq(api_key=_groq_key())
+        client = _Groq(api_key=GROQ_API_KEY)
 
         if stream_callback:
             full_text = ""
@@ -986,7 +986,7 @@ My question: {question}{mode_tag}"""
 
 def ask_ui_adviser(stream_callback=None) -> str:
     """UI/UX improvement analysis agent — returns proposals + embedded CSS artifact."""
-    if not _has_groq():
+    if not HAS_GROQ or not GROQ_API_KEY:
         return _ui_rule_based()
 
     messages = [
@@ -997,7 +997,7 @@ def ask_ui_adviser(stream_callback=None) -> str:
     ]
 
     try:
-        client = _Groq(api_key=_groq_key())
+        client = _Groq(api_key=GROQ_API_KEY)
 
         if stream_callback:
             full_text = ""
@@ -1029,7 +1029,7 @@ def generate_ui_css(approved_titles: list[str], analysis: str,
     Called when the user approves individual items and clicks Apply.
     Returns a CSS string (without fences) ready to write to custom_ui.css.
     """
-    if not _has_groq():
+    if not HAS_GROQ or not GROQ_API_KEY:
         return "/* Groq API key required for CSS generation */"
 
     approved_str = "\n".join(f"- {t}" for t in approved_titles)
@@ -1043,7 +1043,7 @@ def generate_ui_css(approved_titles: list[str], analysis: str,
     ]
 
     try:
-        client = _Groq(api_key=_groq_key())
+        client = _Groq(api_key=GROQ_API_KEY)
 
         if stream_callback:
             full_text = ""

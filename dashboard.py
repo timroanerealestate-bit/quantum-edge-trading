@@ -1312,7 +1312,7 @@ with tab_ai:
             st.rerun()
 
     # API key hint
-    if not adviser._has_groq():
+    if not adviser.HAS_GROQ or not adviser.GROQ_API_KEY:
         st.caption(
             "💡 Add `GROQ_API_KEY=gsk_...` to your `.env` file to enable the "
             "5-layer Research Agent (options flow · IV rank · patterns · sentiment · institutional)."
