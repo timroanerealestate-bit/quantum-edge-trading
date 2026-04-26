@@ -23,50 +23,33 @@ import ai_adviser as adviser
 import market_data as md
 from options_analyzer import summarize_options
 
-# ─── Inject API keys from Streamlit secrets (Cloud) or .env (local) ───────────
+# ─── API Key resolution ────────────────────────────────────────────────────────
+# Priority: st.secrets (Cloud) → .env (local) → session_state (sidebar input)
 import os as _os_keys
 
-def _load_keys():
-    groq_key = ""
-    av_key   = ""
-    ma_key   = ""
-
-    # Try st.secrets (Streamlit Cloud dashboard)
+def _resolve_key(name: str) -> str:
+    """Return API key by checking every possible source in order."""
+    # 1. Streamlit Cloud secrets panel
     try:
-        groq_key = st.secrets["GROQ_API_KEY"]
+        v = st.secrets[name]
+        if v: return str(v).strip()
     except Exception:
         pass
-    try:
-        av_key = st.secrets["ALPHA_VANTAGE_API_KEY"]
-    except Exception:
-        pass
-    try:
-        ma_key = st.secrets["MARKETAUX_API_TOKEN"]
-    except Exception:
-        pass
+    # 2. Local .env / environment variable
+    v = _os_keys.getenv(name, "").strip()
+    if v: return v
+    # 3. Manually entered in sidebar (persisted in session_state)
+    return st.session_state.get(f"_apikey_{name}", "")
 
-    # Fall back to .env (local)
-    if not groq_key:
-        groq_key = _os_keys.getenv("GROQ_API_KEY", "")
-    if not av_key:
-        av_key   = _os_keys.getenv("ALPHA_VANTAGE_API_KEY", "")
-    if not ma_key:
-        ma_key   = _os_keys.getenv("MARKETAUX_API_TOKEN", "")
+# Resolve all keys now (Streamlit context is active)
+_groq_key = _resolve_key("GROQ_API_KEY")
+_av_key   = _resolve_key("ALPHA_VANTAGE_API_KEY")
+_ma_key   = _resolve_key("MARKETAUX_API_TOKEN")
 
-    adviser.GROQ_API_KEY  = groq_key
-    adviser.AV_API_KEY    = av_key
-    adviser.MA_API_TOKEN  = ma_key
-    adviser.HAS_GROQ      = adviser._GROQ_INSTALLED and bool(groq_key)
-
-_load_keys()
-
-# ── DEBUG: remove after confirming keys load on Cloud ─────────────────────────
-with st.sidebar:
-    with st.expander("🔑 Key Debug", expanded=False):
-        st.write("Groq installed:", adviser._GROQ_INSTALLED)
-        st.write("Groq key found:", bool(adviser.GROQ_API_KEY))
-        st.write("HAS_GROQ:", adviser.HAS_GROQ)
-        st.write("Key preview:", adviser.GROQ_API_KEY[:8] + "..." if adviser.GROQ_API_KEY else "EMPTY")
+adviser.GROQ_API_KEY = _groq_key
+adviser.AV_API_KEY   = _av_key
+adviser.MA_API_TOKEN = _ma_key
+adviser.HAS_GROQ     = adviser._GROQ_INSTALLED and bool(_groq_key)
 
 # ─── CSS: Quantum Edge — Charcoal / Emerald / Purple premium theme ───────────
 st.markdown("""
@@ -1006,6 +989,34 @@ def _render_options(opt: dict, simple: bool = False):
 with st.sidebar:
     st.markdown("## 📈 Training Bot")
 
+    # ── Groq API key fallback (shown only when key not in secrets / .env) ─────
+    if not adviser.GROQ_API_KEY:
+        st.markdown(
+            "<div style='background:rgba(255,64,64,0.08);border:1px solid rgba(255,64,64,0.3);"
+            "border-radius:10px;padding:12px 14px;margin-bottom:12px;'>"
+            "<div style='font-size:11px;font-weight:700;color:#ff4040;letter-spacing:1px;"
+            "text-transform:uppercase;margin-bottom:6px;'>⚠ Groq Key Missing</div>"
+            "<div style='font-size:11px;color:#8892a4;'>Enter your key below to enable "
+            "the Research Agent.</div></div>",
+            unsafe_allow_html=True,
+        )
+        _manual_key = st.text_input(
+            "Groq API Key",
+            type="password",
+            placeholder="gsk_...",
+            key="groq_key_input_field",
+        )
+        if st.button("🔑 Apply Key", width="stretch", key="apply_groq_key"):
+            if _manual_key.strip():
+                st.session_state["_apikey_GROQ_API_KEY"] = _manual_key.strip()
+                adviser.GROQ_API_KEY = _manual_key.strip()
+                adviser.HAS_GROQ     = adviser._GROQ_INSTALLED and True
+                st.success("✅ Key applied!")
+                st.rerun()
+            else:
+                st.error("Please enter a valid key.")
+        st.divider()
+
     # ── Market status + refresh ───────────────────────────────────────────────
     _ms = md.get_market_status()
     st.markdown(
@@ -1339,9 +1350,10 @@ with tab_ai:
 
     # API key hint
     if not adviser.HAS_GROQ or not adviser.GROQ_API_KEY:
-        st.caption(
-            "💡 Add `GROQ_API_KEY=gsk_...` to your `.env` file to enable the "
-            "5-layer Research Agent (options flow · IV rank · patterns · sentiment · institutional)."
+        st.warning(
+            "⚠️ **Groq API key not found.** Enter your key in the sidebar to activate "
+            "the Research Agent, or add it to Streamlit Secrets (Settings → Secrets) "
+            "if you're on the live site."
         )
 
 
