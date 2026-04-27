@@ -29,7 +29,11 @@ from streamlit_autorefresh import st_autorefresh
 # Locally:  reads from .streamlit/secrets.toml
 # On Cloud: reads from Streamlit Cloud Settings → Secrets
 
-GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
+try:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+except Exception:
+    GROQ_API_KEY = ""
+
 if not GROQ_API_KEY:
     st.error("🔑 Groq API key is missing. Please add GROQ_API_KEY in Streamlit Cloud Settings → Secrets")
     st.stop()

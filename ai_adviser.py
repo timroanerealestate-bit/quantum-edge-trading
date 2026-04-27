@@ -1139,12 +1139,13 @@ def ask_adviser(
     if scan_results is None:
         scan_results = []
 
-    if not HAS_GROQ or not GROQ_API_KEY:
+    # Bail only if neither Groq nor Gemini is available
+    if (not HAS_GROQ or not GROQ_API_KEY) and not GEMINI_API_KEY:
         return _rule_based_response(question, scan_results, simple_mode)
 
     # ── Full multi-layer validation (every query) ─────────────────────────────
-    screened     = _screen_universe(vix_val=vix_val, progress_cb=progress_cb)
-    universe_ctx = _build_universe_context(screened, vix_val)
+    screened      = _screen_universe(vix_val=vix_val, progress_cb=progress_cb)
+    universe_ctx  = _build_universe_context(screened, vix_val)
     watchlist_ctx = _build_context(scan_results, options_data)
 
     mode_tag = (
@@ -1163,58 +1164,59 @@ My question: {question}{mode_tag}"""
         {"role": "user",   "content": user_msg},
     ]
 
-    groq_model = _pick_groq_model(question)
+    # ── Try Groq first (with smart model routing) ─────────────────────────────
+    if HAS_GROQ and GROQ_API_KEY:
+        groq_model = _pick_groq_model(question)
+        try:
+            client = _Groq(api_key=GROQ_API_KEY)
 
-    try:
-        client = _Groq(api_key=GROQ_API_KEY)
+            if HAS_GROK_LAYER and GROK_API_KEY:
+                resp = client.chat.completions.create(
+                    model=groq_model, messages=messages,
+                    max_tokens=3500, temperature=0.4, stream=False,
+                )
+                groq_text = resp.choices[0].message.content or ""
+                final = _validate_and_consolidate_with_grok(groq_text, question, vix_val)
+                if stream_callback:
+                    stream_callback(final)
+                return final
 
-        # ── Grok validation layer active: get Groq analysis then consolidate ──
-        if HAS_GROK_LAYER and GROK_API_KEY:
+            if stream_callback:
+                full_text = ""
+                stream = client.chat.completions.create(
+                    model=groq_model, messages=messages,
+                    max_tokens=3500, temperature=0.4, stream=True,
+                )
+                for chunk in stream:
+                    text = chunk.choices[0].delta.content or ""
+                    if text:
+                        full_text += text
+                        stream_callback(text)
+                return full_text
+
             resp = client.chat.completions.create(
                 model=groq_model, messages=messages,
                 max_tokens=3500, temperature=0.4, stream=False,
             )
-            groq_text = resp.choices[0].message.content or ""
-            # Grok validates risk, adjusts confidence, returns one final answer
-            final = _validate_and_consolidate_with_grok(groq_text, question, vix_val)
+            return resp.choices[0].message.content or "No response generated."
+
+        except Exception:
+            pass   # fall through silently to Gemini
+
+    # ── Silent fallback: Gemini 1.5 Flash ────────────────────────────────────
+    gemini_text = _ask_gemini(messages)
+    if gemini_text:
+        if HAS_GROK_LAYER and GROK_API_KEY:
+            final = _validate_and_consolidate_with_grok(gemini_text, question, vix_val)
             if stream_callback:
                 stream_callback(final)
             return final
-
-        # ── No Grok key: original Groq-only paths ────────────────────────────
         if stream_callback:
-            full_text = ""
-            stream = client.chat.completions.create(
-                model=groq_model, messages=messages,
-                max_tokens=3500, temperature=0.4, stream=True,
-            )
-            for chunk in stream:
-                text = chunk.choices[0].delta.content or ""
-                if text:
-                    full_text += text
-                    stream_callback(text)
-            return full_text
+            stream_callback(gemini_text)
+        return gemini_text
 
-        resp = client.chat.completions.create(
-            model=groq_model, messages=messages,
-            max_tokens=3500, temperature=0.4, stream=False,
-        )
-        return resp.choices[0].message.content or "No response generated."
-
-    except Exception:
-        # ── Silent fallback to Gemini 1.5 Pro ────────────────────────────────
-        gemini_text = _ask_gemini(messages)
-        if gemini_text:
-            if HAS_GROK_LAYER and GROK_API_KEY:
-                final = _validate_and_consolidate_with_grok(gemini_text, question, vix_val)
-                if stream_callback:
-                    stream_callback(final)
-                return final
-            if stream_callback:
-                stream_callback(gemini_text)
-            return gemini_text
-        # Ultimate fallback — rule-based (no AI keys available)
-        return _rule_based_response(question, scan_results, simple_mode)
+    # Ultimate fallback — rule-based (no AI keys available at all)
+    return _rule_based_response(question, scan_results, simple_mode)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
