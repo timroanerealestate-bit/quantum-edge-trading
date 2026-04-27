@@ -24,9 +24,10 @@ import pandas as pd
 
 # ── API keys — injected by dashboard.py from st.secrets after Streamlit starts ─
 # Do NOT read from os.getenv / .env — keys come exclusively from Streamlit secrets.
-GROQ_API_KEY  = ""
-AV_API_KEY    = ""
-MA_API_TOKEN  = ""
+GROQ_API_KEY     = ""
+AV_API_KEY       = ""
+MA_API_TOKEN     = ""
+FINNHUB_API_KEY  = ""   # fallback for MarketAux news sentiment
 
 try:
     from groq import Groq as _Groq
@@ -610,7 +611,11 @@ def _get_options_flow(sym: str, price: float) -> dict:
 # LAYER 3 — News sentiment  (MarketAux)
 # ═══════════════════════════════════════════════════════════════════════════════
 def _get_news_sentiment(sym: str) -> dict:
-    """Fetch recent sentiment from MarketAux. Cached 30 min."""
+    """
+    Fetch recent news sentiment for a symbol.
+    Primary: MarketAux. Silent fallback: Finnhub.
+    Cached for _ma_ttl() seconds.
+    """
     now = time.time()
     if sym in _MA_CACHE:
         ts, cached = _MA_CACHE[sym]
@@ -619,53 +624,64 @@ def _get_news_sentiment(sym: str) -> dict:
 
     base = {"score": 50, "label": "Neutral", "count": 0, "l3_pts": 0, "headlines": []}
 
-    if not MA_API_TOKEN:
-        return base
+    # ── Helper: score → label + pts ───────────────────────────────────────────
+    def _score_to_result(score: int, count: int, pos: int, neg: int, neut: int,
+                         headlines: list[str]) -> dict:
+        label  = "Bullish" if score >= 62 else ("Bearish" if score <= 38 else "Neutral")
+        l3_pts = 20 if label == "Bullish" else (8 if label == "Neutral" else 0)
+        return {"score": score, "label": label, "count": count,
+                "bull": pos, "bear": neg, "neut": neut,
+                "l3_pts": l3_pts, "headlines": headlines[:3]}
 
-    try:
-        url = (
-            f"https://api.marketaux.com/v1/news/all"
-            f"?symbols={sym}&api_token={MA_API_TOKEN}"
-            f"&language=en&limit=5&filter_entities=true"
-        )
-        r    = requests.get(url, timeout=8)
-        data = r.json()
-        arts = data.get("data", [])
+    # ── Primary: MarketAux ───────────────────────────────────────────────────
+    if MA_API_TOKEN:
+        try:
+            url  = (f"https://api.marketaux.com/v1/news/all"
+                    f"?symbols={sym}&api_token={MA_API_TOKEN}"
+                    f"&language=en&limit=5&filter_entities=true")
+            data = requests.get(url, timeout=8).json()
+            # Treat rate-limit / token-limit errors as failures
+            if data.get("error") or "rate limit" in str(data).lower():
+                raise ValueError("MarketAux limit")
+            arts = data.get("data", [])
+            pos = neg = neut = 0
+            headlines = []
+            for art in arts:
+                headlines.append(art.get("title", "")[:80])
+                for ent in art.get("entities", []):
+                    s = float(ent.get("sentiment_score", 0))
+                    if s > 0.1:    pos  += 1
+                    elif s < -0.1: neg  += 1
+                    else:          neut += 1
+            total  = pos + neg + neut
+            score  = int(((pos - neg) / total + 1) / 2 * 100) if total else 50
+            result = _score_to_result(score, len(arts), pos, neg, neut, headlines)
+            _MA_CACHE[sym] = (now, result)
+            return result
+        except Exception:
+            pass   # fall through to Finnhub silently
 
-        pos = neg = neut = 0
-        headlines = []
-        for art in arts:
-            headlines.append(art.get("title", "")[:80])
-            for ent in art.get("entities", []):
-                s = float(ent.get("sentiment_score", 0))
-                if s > 0.1:   pos  += 1
-                elif s < -0.1: neg += 1
-                else:          neut += 1
+    # ── Fallback: Finnhub news-sentiment ────────────────────────────────────
+    if FINNHUB_API_KEY:
+        try:
+            url  = (f"https://finnhub.io/api/v1/news-sentiment"
+                    f"?symbol={sym}&token={FINNHUB_API_KEY}")
+            data = requests.get(url, timeout=8).json()
+            bull_pct = float(data.get("sentiment", {}).get("bullishPercent", 0.5))
+            bear_pct = float(data.get("sentiment", {}).get("bearishPercent", 0.5))
+            buzz     = int(data.get("buzz", {}).get("articlesInLastWeek", 0))
+            score    = int(bull_pct * 100)
+            pos      = int(bull_pct * buzz)
+            neg      = int(bear_pct * buzz)
+            neut     = max(0, buzz - pos - neg)
+            result   = _score_to_result(score, buzz, pos, neg, neut, [])
+            _MA_CACHE[sym] = (now, result)
+            return result
+        except Exception:
+            pass
 
-        total = pos + neg + neut
-        score = int(((pos - neg) / total + 1) / 2 * 100) if total else 50
-        label = "Bullish" if score >= 62 else ("Bearish" if score <= 38 else "Neutral")
-
-        # L3 confidence contribution (max 20 pts)
-        l3_pts = 0
-        if label == "Bullish":  l3_pts = 20
-        elif label == "Neutral": l3_pts = 8
-        else:                    l3_pts = 0
-
-        result = {
-            "score":     score,
-            "label":     label,
-            "count":     len(arts),
-            "bull":      pos, "bear": neg, "neut": neut,
-            "l3_pts":    l3_pts,
-            "headlines": headlines[:3],
-        }
-        _MA_CACHE[sym] = (now, result)
-        return result
-
-    except Exception:
-        _MA_CACHE[sym] = (now, base)
-        return base
+    _MA_CACHE[sym] = (now, base)
+    return base
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

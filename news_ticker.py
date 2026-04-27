@@ -3,7 +3,7 @@ Market Pulse News Ticker
 ========================
 Fetches high-impact global financial news for the scrolling ticker.
 
-Primary source  : MarketAux API (general market news)
+Primary source  : Finnhub general news API
 Fallback source : Alpha Vantage NEWS_SENTIMENT endpoint
 
 Scheduled refresh windows (ET):
@@ -22,8 +22,8 @@ import requests
 from datetime import datetime, date
 
 # ── Keys injected by dashboard.py from st.secrets ────────────────────────────
-MA_API_TOKEN: str = ""
-AV_API_KEY:   str = ""
+FINNHUB_API_KEY: str = ""
+AV_API_KEY:      str = ""
 
 # ── High-impact keyword filter ────────────────────────────────────────────────
 _HIGH_IMPACT: list[str] = [
@@ -102,9 +102,9 @@ def fetch_ticker_items(limit: int = 15) -> list[dict]:
     """
     Return up to `limit` high-impact news items.
     Each item: {"emoji": str, "headline": str, "source": str}
-    Falls back to static placeholder text if both APIs fail.
+    Primary: Finnhub. Fallback: Alpha Vantage. Final: static placeholder.
     """
-    items = _from_marketaux(limit)
+    items = _from_finnhub(limit)
     if len(items) < 3:
         items = items + _from_alphavantage(limit)
 
@@ -120,34 +120,25 @@ def fetch_ticker_items(limit: int = 15) -> list[dict]:
     return unique[:12] if unique else _fallback_items()
 
 
-# ── MarketAux source ──────────────────────────────────────────────────────────
+# ── Finnhub source ────────────────────────────────────────────────────────────
 
-def _from_marketaux(limit: int) -> list[dict]:
-    if not MA_API_TOKEN:
+def _from_finnhub(limit: int) -> list[dict]:
+    if not FINNHUB_API_KEY:
         return []
     try:
-        url = (
-            "https://api.marketaux.com/v1/news/all"
-            f"?api_token={MA_API_TOKEN}"
-            "&language=en&limit=30&sort=published_at"
-        )
+        url  = (f"https://finnhub.io/api/v1/news"
+                f"?category=general&token={FINNHUB_API_KEY}")
         data = requests.get(url, timeout=8).json()
         items: list[dict] = []
-        for art in data.get("data", []):
-            title   = art.get("title", "").strip()
-            summary = art.get("description") or art.get("snippet", "")
+        for art in (data if isinstance(data, list) else []):
+            title   = art.get("headline", "").strip()
+            summary = art.get("summary", "")
             if not title or not _is_high_impact(title, summary):
                 continue
-            scores = [
-                float(e.get("sentiment_score", 0))
-                for e in art.get("entities", [])
-                if e.get("sentiment_score") is not None
-            ]
-            avg = sum(scores) / len(scores) if scores else 0.0
             items.append({
-                "emoji":    _sentiment_emoji(avg),
+                "emoji":    "⚪",   # Finnhub general news has no per-article score
                 "headline": title[:140],
-                "source":   art.get("source", "MarketAux"),
+                "source":   art.get("source", "Finnhub"),
             })
         return items
     except Exception:

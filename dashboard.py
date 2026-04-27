@@ -41,12 +41,13 @@ if "GROQ_API_KEY" not in st.secrets:
     )
     st.stop()
 
-adviser.GROQ_API_KEY  = st.secrets["GROQ_API_KEY"]
-adviser.AV_API_KEY    = st.secrets.get("ALPHA_VANTAGE_API_KEY", "")
-adviser.MA_API_TOKEN  = st.secrets.get("MARKETAUX_API_TOKEN", "")
-adviser.HAS_GROQ      = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
-adviser.GROK_API_KEY  = st.secrets.get("GROK_API_KEY", "")
-adviser.HAS_GROK_LAYER = adviser._OPENAI_INSTALLED and bool(adviser.GROK_API_KEY)
+adviser.GROQ_API_KEY     = st.secrets["GROQ_API_KEY"]
+adviser.AV_API_KEY       = st.secrets.get("ALPHA_VANTAGE_API_KEY", "")
+adviser.MA_API_TOKEN     = st.secrets.get("MARKETAUX_API_TOKEN", "")
+adviser.FINNHUB_API_KEY  = st.secrets.get("FINNHUB_API_KEY", "")
+adviser.HAS_GROQ         = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
+adviser.GROK_API_KEY     = st.secrets.get("GROK_API_KEY", "")
+adviser.HAS_GROK_LAYER   = adviser._OPENAI_INSTALLED and bool(adviser.GROK_API_KEY)
 
 # ─── Auto-refresh every 5 min — keeps news ticker and VIX current ─────────────
 st_autorefresh(interval=300_000, key="newsrefresh")
@@ -1128,10 +1129,10 @@ st.markdown(f"""
 
 # ─── Market Pulse Ticker ──────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
-def _load_ticker(_bucket: str, _ma: str, _av: str) -> list[dict]:
+def _load_ticker(_bucket: str, _fh: str, _av: str) -> list[dict]:
     """Fetch high-impact news; re-runs only when the refresh bucket changes."""
-    nt.MA_API_TOKEN = _ma
-    nt.AV_API_KEY   = _av
+    nt.FINNHUB_API_KEY = _fh
+    nt.AV_API_KEY      = _av
     return nt.fetch_ticker_items()
 
 
@@ -1178,7 +1179,7 @@ def _render_ticker(items: list[dict]) -> None:
 
 _ticker_items = _load_ticker(
     nt.get_refresh_bucket(),
-    st.secrets.get("MARKETAUX_API_TOKEN", ""),
+    st.secrets.get("FINNHUB_API_KEY", ""),
     st.secrets.get("ALPHA_VANTAGE_API_KEY", ""),
 )
 _render_ticker(_ticker_items)
