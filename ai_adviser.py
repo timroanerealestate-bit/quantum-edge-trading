@@ -28,6 +28,7 @@ GROQ_API_KEY     = ""
 AV_API_KEY       = ""
 MA_API_TOKEN     = ""
 FINNHUB_API_KEY  = ""   # fallback for MarketAux news sentiment
+GEMINI_API_KEY   = ""   # silent fallback when Groq is unavailable
 
 try:
     from groq import Groq as _Groq
@@ -36,7 +37,12 @@ except ImportError:
     _Groq = None
     _GROQ_INSTALLED = False
 
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL       = "llama-3.3-70b-versatile"   # default / long-question model
+GROQ_MODEL_FAST  = "llama-3.1-8b-instant"      # short-question model (≤12 words)
+
+def _pick_groq_model(question: str) -> str:
+    """Route to the fast model for short questions, full model for complex ones."""
+    return GROQ_MODEL_FAST if len(question.split()) <= 12 else GROQ_MODEL
 
 HAS_GROQ = _GROQ_INSTALLED  # True when package is installed; key injected at runtime
 
@@ -1080,6 +1086,39 @@ Current VIX: {vix_str}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# GEMINI FALLBACK  (silent — used only when Groq is unavailable)
+# ═══════════════════════════════════════════════════════════════════════════════
+def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
+    """
+    Silent fallback to Gemini 1.5 Pro via REST API.
+    Returns empty string if key is missing or call fails — never raises.
+    """
+    if not GEMINI_API_KEY:
+        return ""
+    try:
+        system_text = next(
+            (m["content"] for m in messages if m["role"] == "system"), ""
+        )
+        user_text = "\n\n".join(
+            m["content"] for m in messages if m["role"] == "user"
+        )
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta"
+            f"/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+        )
+        payload = {
+            "systemInstruction": {"parts": [{"text": system_text}]},
+            "contents":          [{"role": "user", "parts": [{"text": user_text}]}],
+            "generationConfig":  {"maxOutputTokens": max_tokens, "temperature": 0.4},
+        }
+        resp = requests.post(url, json=payload, timeout=60)
+        resp.raise_for_status()
+        return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception:
+        return ""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # PUBLIC API
 # ═══════════════════════════════════════════════════════════════════════════════
 def ask_adviser(
@@ -1124,13 +1163,15 @@ My question: {question}{mode_tag}"""
         {"role": "user",   "content": user_msg},
     ]
 
+    groq_model = _pick_groq_model(question)
+
     try:
         client = _Groq(api_key=GROQ_API_KEY)
 
         # ── Grok validation layer active: get Groq analysis then consolidate ──
         if HAS_GROK_LAYER and GROK_API_KEY:
             resp = client.chat.completions.create(
-                model=GROQ_MODEL, messages=messages,
+                model=groq_model, messages=messages,
                 max_tokens=3500, temperature=0.4, stream=False,
             )
             groq_text = resp.choices[0].message.content or ""
@@ -1144,7 +1185,7 @@ My question: {question}{mode_tag}"""
         if stream_callback:
             full_text = ""
             stream = client.chat.completions.create(
-                model=GROQ_MODEL, messages=messages,
+                model=groq_model, messages=messages,
                 max_tokens=3500, temperature=0.4, stream=True,
             )
             for chunk in stream:
@@ -1155,14 +1196,25 @@ My question: {question}{mode_tag}"""
             return full_text
 
         resp = client.chat.completions.create(
-            model=GROQ_MODEL, messages=messages,
+            model=groq_model, messages=messages,
             max_tokens=3500, temperature=0.4, stream=False,
         )
         return resp.choices[0].message.content or "No response generated."
 
-    except Exception as e:
-        fallback = _rule_based_response(question, scan_results, simple_mode)
-        return f"⚠️ AI error: {e}\n\n---\n\n{fallback}"
+    except Exception:
+        # ── Silent fallback to Gemini 1.5 Pro ────────────────────────────────
+        gemini_text = _ask_gemini(messages)
+        if gemini_text:
+            if HAS_GROK_LAYER and GROK_API_KEY:
+                final = _validate_and_consolidate_with_grok(gemini_text, question, vix_val)
+                if stream_callback:
+                    stream_callback(final)
+                return final
+            if stream_callback:
+                stream_callback(gemini_text)
+            return gemini_text
+        # Ultimate fallback — rule-based (no AI keys available)
+        return _rule_based_response(question, scan_results, simple_mode)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

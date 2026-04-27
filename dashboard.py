@@ -45,6 +45,7 @@ adviser.GROQ_API_KEY     = st.secrets["GROQ_API_KEY"]
 adviser.AV_API_KEY       = st.secrets.get("ALPHA_VANTAGE_API_KEY", "")
 adviser.MA_API_TOKEN     = st.secrets.get("MARKETAUX_API_TOKEN", "")
 adviser.FINNHUB_API_KEY  = st.secrets.get("FINNHUB_API_KEY", "")
+adviser.GEMINI_API_KEY   = st.secrets.get("GEMINI_API_KEY", "")
 adviser.HAS_GROQ         = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
 adviser.GROK_API_KEY     = st.secrets.get("GROK_API_KEY", "")
 adviser.HAS_GROK_LAYER   = adviser._OPENAI_INSTALLED and bool(adviser.GROK_API_KEY)
