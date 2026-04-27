@@ -17,35 +17,16 @@ Confidence scoring (0-100):
   LOW    < 50  — mixed signals, excluded from recommendations
 """
 from __future__ import annotations
-import os
 import time
 import requests
 import yfinance as yf
 import pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv()
-
-def _get_secret(key: str) -> str:
-    """Read from Streamlit secrets (Cloud) with fallback to .env (local)."""
-    # Try Streamlit secrets first (works on Cloud and locally with secrets.toml)
-    try:
-        import streamlit as st
-        val = st.secrets.get(key, "")
-        if val:
-            return val
-    except Exception:
-        pass
-    # Fall back to environment variable (.env loaded above)
-    return os.getenv(key, "")
-
-# Keys are re-fetched at call time inside each function — module-level values
-# are only used as a fast-path check; actual API calls always call _get_secret().
-# Keys are injected by dashboard.py via _load_keys() after Streamlit starts.
-# These defaults are only used if ai_adviser is imported outside of dashboard.py.
-GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
-AV_API_KEY    = os.getenv("ALPHA_VANTAGE_API_KEY", "")
-MA_API_TOKEN  = os.getenv("MARKETAUX_API_TOKEN", "")
+# ── API keys — injected by dashboard.py from st.secrets after Streamlit starts ─
+# Do NOT read from os.getenv / .env — keys come exclusively from Streamlit secrets.
+GROQ_API_KEY  = ""
+AV_API_KEY    = ""
+MA_API_TOKEN  = ""
 
 try:
     from groq import Groq as _Groq
@@ -54,15 +35,9 @@ except ImportError:
     _Groq = None
     _GROQ_INSTALLED = False
 
-def _groq_key() -> str:
-    """Always fetch the freshest key — works both locally and on Streamlit Cloud."""
-    return _get_secret("GROQ_API_KEY")
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
-def _has_groq() -> bool:
-    return _GROQ_INSTALLED and bool(_groq_key())
-GROQ_MODEL    = "llama-3.3-70b-versatile"
-
-HAS_GROQ = _GROQ_INSTALLED  # package installed; key checked at call time
+HAS_GROQ = _GROQ_INSTALLED  # True when package is installed; key injected at runtime
 
 
 # ── Stock universe ────────────────────────────────────────────────────────────
