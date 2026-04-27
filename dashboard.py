@@ -46,36 +46,38 @@ adviser.HAS_GROQ      = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
 adviser.GROK_API_KEY  = st.secrets.get("GROK_API_KEY", "")
 adviser.HAS_GROK_LAYER = adviser._OPENAI_INSTALLED and bool(adviser.GROK_API_KEY)
 
-# ─── CSS: Quantum Edge — Charcoal / Emerald / Purple premium theme ───────────
+# ─── CSS: Quantum Edge — Deep Space / Electric Cyan / Purple / Emerald ────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ════════════════════════════════════════════════════
-   GLOBAL RESET & BASE
+   DEEP SPACE DESIGN SYSTEM
    Palette:
-     BG main   #0f1014   charcoal black
-     BG card   #1a1b22   dark panel
-     BG raised #21222c   elevated surface
-     Emerald   #00d26a   gains / active / primary
-     Purple    #8b56f6   secondary / AI
-     Red       #ff4040   losses / danger
-     Gold      #f5a623   watch / neutral
-     Text-1    #f0f0f5   primary
-     Text-2    #8892a4   secondary
-     Border    rgba(255,255,255,0.06)
-═══════════════════════════════════════════════════ */
+     Void black   #07080f
+     Cyan         #00e5ff  electric primary
+     Purple       #a855f7  AI / secondary
+     Emerald      #10ffb0  gains / bullish
+     Orange       #f97316  caution / elevated
+     Red          #ff3d57  danger / bearish
+     Gold         #fbbf24  watch / neutral
+     Text-1       #f0f4ff
+     Text-2       #8892b0
+     Glass card   rgba(10,12,28,0.85) + blur(20px)
+════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body, [class*="css"], .stApp {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    color: #f0f4ff !important;
 }
 
 .stApp {
-    background-color: #0f1014 !important;
+    background: #07080f !important;
     background-image:
-        radial-gradient(ellipse 70% 50% at 15% 0%,  rgba(0,210,106,0.04)  0%, transparent 55%),
-        radial-gradient(ellipse 55% 45% at 85% 95%, rgba(139,86,246,0.04) 0%, transparent 55%) !important;
+        radial-gradient(ellipse 80% 60% at 10% -10%,  rgba(0,229,255,0.07)  0%, transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 110%,  rgba(168,85,247,0.08) 0%, transparent 55%),
+        radial-gradient(ellipse 40% 30% at 50% 50%,   rgba(16,255,176,0.02) 0%, transparent 70%) !important;
     min-height: 100vh;
 }
 
@@ -88,139 +90,163 @@ html, body, [class*="css"], .stApp {
 
 /* ════════════════════════════════════════════════════
    KEYFRAMES
-═══════════════════════════════════════════════════ */
-@keyframes shimmer {
-    0%   { background-position: -600px 0; }
-    100% { background-position: 600px 0; }
+════════════════════════════════════════════════════ */
+@keyframes shimmer-text {
+    0%   { background-position: -200% center; }
+    100% { background-position:  200% center; }
 }
-@keyframes live-dot {
-    0%, 100% { opacity: 1;    transform: scale(1);    }
-    50%       { opacity: 0.3; transform: scale(0.85); }
+@keyframes live-pulse {
+    0%, 100% { opacity: 1;   box-shadow: 0 0 6px #00e5ff, 0 0 12px rgba(0,229,255,0.4); }
+    50%       { opacity: 0.4; box-shadow: 0 0 3px #00e5ff; }
 }
-@keyframes glow-pulse {
-    0%, 100% { box-shadow: 0 0 10px rgba(0,210,106,0.3), 0 4px 0 #007535; }
-    50%       { box-shadow: 0 0 24px rgba(0,210,106,0.55), 0 4px 0 #007535; }
+@keyframes glow-cyan {
+    0%, 100% { box-shadow: 0 0 20px rgba(0,229,255,0.22), 0 0 60px rgba(0,229,255,0.06); }
+    50%       { box-shadow: 0 0 36px rgba(0,229,255,0.45), 0 0 80px rgba(0,229,255,0.14); }
 }
-@keyframes border-breathe {
-    0%, 100% { border-color: rgba(0,210,106,0.25); }
-    50%       { border-color: rgba(0,210,106,0.6);  }
+@keyframes glow-purple {
+    0%, 100% { box-shadow: 0 8px 48px rgba(0,0,0,0.55), 0 0 80px rgba(168,85,247,0.06); }
+    50%       { box-shadow: 0 8px 48px rgba(0,0,0,0.55), 0 0 120px rgba(168,85,247,0.14); }
 }
-@keyframes float-up {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0);   }
+@keyframes aurora {
+    0%   { background-position: 0%   50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0%   50%; }
+}
+@keyframes slide-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0);    }
 }
 @keyframes card-in {
-    from { opacity: 0; transform: translateY(12px) scale(0.98); }
+    from { opacity: 0; transform: translateY(14px) scale(0.97); }
     to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+@keyframes border-breathe {
+    0%, 100% { border-color: rgba(168,85,247,0.3); }
+    50%       { border-color: rgba(168,85,247,0.7); }
+}
+@keyframes float-glow {
+    0%, 100% { transform: translateY(0);    filter: drop-shadow(0 0 8px  rgba(0,229,255,0.5)); }
+    50%       { transform: translateY(-3px); filter: drop-shadow(0 0 18px rgba(0,229,255,0.9)); }
 }
 
 /* ════════════════════════════════════════════════════
    TOP HEADER BANNER
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 .qe-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: #13141a;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(7,8,15,0.96);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-bottom: 1px solid rgba(0,229,255,0.1);
     padding: 0 32px;
-    height: 64px;
+    height: 68px;
     margin: -1rem -2rem 2rem -2rem;
     position: relative;
     overflow: hidden;
 }
-.qe-header::after {
+.qe-header::before {
     content: '';
     position: absolute;
     bottom: 0; left: 0; right: 0; height: 1px;
     background: linear-gradient(90deg,
-        transparent 0%, rgba(0,210,106,0.5) 30%,
-        rgba(0,210,106,0.9) 50%, rgba(0,210,106,0.5) 70%,
-        transparent 100%);
+        transparent 0%, #00e5ff 25%, #a855f7 50%, #10ffb0 75%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer-text 5s linear infinite;
 }
-.qe-brand { display: flex; align-items: center; gap: 12px; }
+.qe-brand { display: flex; align-items: center; gap: 14px; }
 .qe-logo-mark {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, #00d26a, #00a850);
-    border-radius: 9px;
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, #00e5ff 0%, #a855f7 100%);
+    border-radius: 11px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem; font-weight: 900; color: #0f1014;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.88rem; font-weight: 700; color: #07080f;
     letter-spacing: -1px;
-    box-shadow: 0 0 18px rgba(0,210,106,0.4), 0 2px 8px rgba(0,0,0,0.5);
+    flex-shrink: 0;
+    animation: float-glow 3s ease-in-out infinite;
 }
 .qe-title {
+    font-family: 'Space Grotesk', sans-serif;
     font-size: 1.05rem;
-    font-weight: 800;
-    letter-spacing: 2.5px;
+    font-weight: 700;
+    letter-spacing: 3px;
     text-transform: uppercase;
-    color: #f0f0f5;
+    background: linear-gradient(90deg, #f0f4ff 0%, #00e5ff 35%, #a855f7 65%, #f0f4ff 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer-text 6s linear infinite;
 }
-.qe-title span { color: #00d26a; }
 .qe-subtitle {
-    font-size: 0.62rem;
-    color: rgba(255,255,255,0.25);
+    font-size: 0.6rem;
+    color: rgba(136,146,176,0.55);
     letter-spacing: 2px;
     text-transform: uppercase;
-    margin-top: 1px;
+    margin-top: 2px;
     font-weight: 500;
 }
 .qe-nav {
-    display: flex; align-items: center; gap: 6px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.05);
-    border-radius: 20px; padding: 4px 6px;
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 22px; padding: 4px 6px;
 }
 .qe-nav-pill {
-    padding: 5px 14px; border-radius: 16px;
+    padding: 5px 16px; border-radius: 18px;
     font-size: 0.72rem; font-weight: 600;
-    letter-spacing: 0.5px; color: rgba(255,255,255,0.35);
+    letter-spacing: 0.5px; color: rgba(255,255,255,0.28);
     cursor: default; transition: all 0.2s;
 }
 .qe-nav-pill.active {
-    background: rgba(0,210,106,0.15);
-    color: #00d26a;
-    border: 1px solid rgba(0,210,106,0.25);
+    background: linear-gradient(135deg, rgba(0,229,255,0.1), rgba(168,85,247,0.1));
+    color: #00e5ff;
+    border: 1px solid rgba(0,229,255,0.2);
 }
-.qe-meta { display: flex; align-items: center; gap: 20px; }
+.qe-meta { display: flex; align-items: center; gap: 16px; }
 .qe-badge {
-    display: flex; align-items: center; gap: 6px;
-    background: rgba(0,210,106,0.08);
-    border: 1px solid rgba(0,210,106,0.2);
-    border-radius: 20px; padding: 5px 12px;
+    display: flex; align-items: center; gap: 7px;
+    background: rgba(0,229,255,0.06);
+    border: 1px solid rgba(0,229,255,0.18);
+    border-radius: 20px; padding: 5px 14px;
 }
 .qe-live-dot {
     width: 6px; height: 6px; border-radius: 50%;
-    background: #00d26a;
-    box-shadow: 0 0 6px #00d26a;
-    animation: live-dot 2s ease-in-out infinite;
+    background: #00e5ff;
+    flex-shrink: 0;
+    animation: live-pulse 2s ease-in-out infinite;
 }
 .qe-live-text {
     font-size: 0.68rem; font-weight: 700;
-    letter-spacing: 1.5px; color: #00d26a;
+    letter-spacing: 2px; color: #00e5ff;
     text-transform: uppercase;
 }
 .qe-timestamp {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 0.7rem; color: rgba(255,255,255,0.22);
+    font-size: 0.68rem; color: rgba(136,146,176,0.4);
     letter-spacing: 0.5px;
 }
 
 /* ════════════════════════════════════════════════════
    SIDEBAR
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
-    background: #13141a !important;
-    border-right: 1px solid rgba(255,255,255,0.05) !important;
+    background: rgba(8,9,18,0.97) !important;
+    backdrop-filter: blur(20px) !important;
+    border-right: 1px solid rgba(0,229,255,0.06) !important;
 }
 [data-testid="stSidebar"] > div:first-child { padding-top: 1.2rem; }
 [data-testid="stSidebar"] .stMarkdown h2 {
+    font-family: 'Space Grotesk', sans-serif !important;
     font-size: 0.64rem !important;
     font-weight: 700 !important;
     letter-spacing: 3px !important;
     text-transform: uppercase !important;
-    color: rgba(255,255,255,0.2) !important;
+    color: rgba(0,229,255,0.4) !important;
     padding: 4px 0 8px 0 !important;
-    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+    border-bottom: 1px solid rgba(0,229,255,0.08) !important;
     margin-bottom: 14px !important;
 }
 [data-testid="stSidebar"] .stMarkdown h3 {
@@ -228,71 +254,75 @@ html, body, [class*="css"], .stApp {
     font-weight: 700 !important;
     letter-spacing: 2.5px !important;
     text-transform: uppercase !important;
-    color: rgba(255,255,255,0.18) !important;
+    color: rgba(168,85,247,0.5) !important;
     margin-top: 1.4rem !important;
     margin-bottom: 10px !important;
 }
 [data-testid="stSidebar"] hr {
-    border-color: rgba(255,255,255,0.05) !important;
+    border-color: rgba(255,255,255,0.04) !important;
     margin: 14px 0 !important;
 }
 
 /* ════════════════════════════════════════════════════
-   METRIC CARDS  (glass morphism — charcoal/emerald)
-═══════════════════════════════════════════════════ */
+   METRIC CARDS — glassmorphic deep space
+════════════════════════════════════════════════════ */
 [data-testid="stMetric"] {
-    background: #1a1b22 !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-top: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 16px !important;
+    background: rgba(10,12,28,0.7) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(0,229,255,0.08) !important;
+    border-top: 1px solid rgba(0,229,255,0.15) !important;
+    border-radius: 18px !important;
     padding: 22px 24px !important;
     position: relative;
     overflow: hidden;
-    transition: all 0.25s ease !important;
-    animation: card-in 0.35s ease forwards;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.05) inset !important;
+    transition: all 0.3s ease !important;
+    animation: card-in 0.4s ease forwards;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.5), 0 1px 0 rgba(0,229,255,0.05) inset !important;
 }
 [data-testid="stMetric"]::before {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, transparent, rgba(0,210,106,0.5), transparent);
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,229,255,0.5), rgba(168,85,247,0.4), transparent);
 }
 [data-testid="stMetric"]:hover {
-    border-color: rgba(0,210,106,0.2) !important;
-    transform: translateY(-3px) !important;
-    box-shadow: 0 12px 36px rgba(0,0,0,0.45), 0 0 0 1px rgba(0,210,106,0.12), 0 1px 0 rgba(255,255,255,0.06) inset !important;
+    border-color: rgba(0,229,255,0.2) !important;
+    transform: translateY(-4px) !important;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(0,229,255,0.14),
+                0 0 40px rgba(0,229,255,0.06), 0 1px 0 rgba(0,229,255,0.08) inset !important;
 }
 [data-testid="stMetricLabel"] > div {
-    color: rgba(255,255,255,0.3) !important;
-    font-size: 0.66rem !important;
+    color: rgba(136,146,176,0.65) !important;
+    font-size: 0.65rem !important;
     font-weight: 700 !important;
     text-transform: uppercase !important;
-    letter-spacing: 2px !important;
+    letter-spacing: 2.5px !important;
 }
 [data-testid="stMetricValue"] > div {
-    color: #f0f0f5 !important;
-    font-size: 1.8rem !important;
+    color: #f0f4ff !important;
+    font-size: 1.9rem !important;
     font-weight: 700 !important;
     font-variant-numeric: tabular-nums !important;
     letter-spacing: -0.5px !important;
 }
 
 /* ════════════════════════════════════════════════════
-   TABS — charcoal / emerald
-═══════════════════════════════════════════════════ */
+   TABS — deep space electric
+════════════════════════════════════════════════════ */
 .stTabs [data-baseweb="tab-list"] {
-    background: #13141a !important;
-    border-radius: 14px !important;
+    background: rgba(10,12,28,0.6) !important;
+    backdrop-filter: blur(16px) !important;
+    border-radius: 16px !important;
     padding: 5px !important;
     gap: 3px !important;
-    border: 1px solid rgba(255,255,255,0.06) !important;
+    border: 1px solid rgba(0,229,255,0.07) !important;
     margin-bottom: 1.8rem !important;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.3) !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4) !important;
 }
 .stTabs [data-baseweb="tab"] {
-    border-radius: 10px !important;
-    color: rgba(255,255,255,0.3) !important;
+    border-radius: 12px !important;
+    color: rgba(136,146,176,0.55) !important;
     font-weight: 600 !important;
     font-size: 0.82rem !important;
     letter-spacing: 0.3px !important;
@@ -301,453 +331,521 @@ html, body, [class*="css"], .stApp {
     border: 1px solid transparent !important;
 }
 .stTabs [data-baseweb="tab"]:hover {
-    color: rgba(255,255,255,0.7) !important;
-    background: rgba(255,255,255,0.04) !important;
+    color: rgba(240,244,255,0.8) !important;
+    background: rgba(0,229,255,0.04) !important;
 }
 .stTabs [aria-selected="true"] {
-    background: rgba(0,210,106,0.1) !important;
-    color: #00d26a !important;
-    border-color: rgba(0,210,106,0.22) !important;
-    box-shadow: 0 0 14px rgba(0,210,106,0.1), 0 1px 0 rgba(0,210,106,0.15) inset !important;
-    text-shadow: 0 0 10px rgba(0,210,106,0.35) !important;
+    background: linear-gradient(135deg, rgba(0,229,255,0.1), rgba(168,85,247,0.1)) !important;
+    color: #00e5ff !important;
+    border-color: rgba(0,229,255,0.2) !important;
+    box-shadow: 0 0 20px rgba(0,229,255,0.08), 0 1px 0 rgba(0,229,255,0.12) inset !important;
+    text-shadow: 0 0 12px rgba(0,229,255,0.5) !important;
 }
 
 /* ════════════════════════════════════════════════════
-   BUTTONS — elevated / 3D (no more flat!)
-═══════════════════════════════════════════════════ */
-
-/* Primary — emerald raised button */
+   BUTTONS
+════════════════════════════════════════════════════ */
 .stButton > button[kind="primary"] {
-    background: linear-gradient(180deg, #00df72 0%, #00c062 50%, #00a850 100%) !important;
+    background: linear-gradient(135deg, #00e5ff 0%, #a855f7 100%) !important;
     border: none !important;
-    border-bottom: none !important;
-    border-radius: 10px !important;
-    color: #0a1a0f !important;
+    border-radius: 12px !important;
+    color: #07080f !important;
     font-weight: 800 !important;
     font-size: 0.84rem !important;
     letter-spacing: 0.8px !important;
     text-transform: uppercase !important;
-    padding: 11px 24px !important;
-    position: relative !important;
-    transition: all 0.12s ease !important;
-    box-shadow:
-        0 1px 0 rgba(255,255,255,0.25) inset,
-        0 -2px 0 rgba(0,0,0,0.25) inset,
-        0 5px 0 #006b32,
-        0 8px 20px rgba(0,180,80,0.35) !important;
+    padding: 12px 24px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 0 20px rgba(0,229,255,0.25), 0 4px 16px rgba(0,0,0,0.4) !important;
     transform: translateY(0) !important;
 }
 .stButton > button[kind="primary"]:hover {
-    background: linear-gradient(180deg, #00f07e 0%, #00d068 50%, #00b558 100%) !important;
     transform: translateY(-2px) !important;
-    box-shadow:
-        0 1px 0 rgba(255,255,255,0.25) inset,
-        0 -2px 0 rgba(0,0,0,0.25) inset,
-        0 7px 0 #006b32,
-        0 12px 28px rgba(0,180,80,0.45) !important;
+    box-shadow: 0 0 36px rgba(0,229,255,0.5), 0 8px 24px rgba(0,0,0,0.45) !important;
+    filter: brightness(1.08) !important;
 }
 .stButton > button[kind="primary"]:active {
-    transform: translateY(4px) !important;
-    box-shadow:
-        0 1px 0 rgba(255,255,255,0.2) inset,
-        0 -1px 0 rgba(0,0,0,0.2) inset,
-        0 1px 0 #006b32,
-        0 2px 8px rgba(0,180,80,0.2) !important;
+    transform: translateY(1px) !important;
+    box-shadow: 0 0 12px rgba(0,229,255,0.18), 0 2px 8px rgba(0,0,0,0.3) !important;
 }
 
-/* Secondary — glass raised button */
 .stButton > button[kind="secondary"] {
-    background: linear-gradient(180deg, #272830 0%, #21222c 100%) !important;
-    border: 1px solid rgba(255,255,255,0.1) !important;
-    border-radius: 10px !important;
-    color: rgba(255,255,255,0.65) !important;
+    background: rgba(10,12,28,0.7) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(0,229,255,0.12) !important;
+    border-radius: 12px !important;
+    color: rgba(240,244,255,0.55) !important;
     font-weight: 600 !important;
     font-size: 0.82rem !important;
-    padding: 10px 20px !important;
-    transition: all 0.15s ease !important;
-    box-shadow:
-        0 1px 0 rgba(255,255,255,0.08) inset,
-        0 4px 0 #0f1014,
-        0 6px 16px rgba(0,0,0,0.35) !important;
+    padding: 11px 20px !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.35) !important;
     transform: translateY(0) !important;
 }
 .stButton > button[kind="secondary"]:hover {
-    background: linear-gradient(180deg, #2d2e38 0%, #262730 100%) !important;
-    border-color: rgba(255,255,255,0.18) !important;
-    color: #f0f0f5 !important;
+    border-color: rgba(0,229,255,0.3) !important;
+    color: #00e5ff !important;
+    background: rgba(0,229,255,0.05) !important;
     transform: translateY(-2px) !important;
-    box-shadow:
-        0 1px 0 rgba(255,255,255,0.1) inset,
-        0 6px 0 #0f1014,
-        0 10px 22px rgba(0,0,0,0.4) !important;
+    box-shadow: 0 0 20px rgba(0,229,255,0.1), 0 8px 20px rgba(0,0,0,0.4) !important;
 }
 .stButton > button[kind="secondary"]:active {
-    transform: translateY(3px) !important;
-    box-shadow:
-        0 1px 0 rgba(255,255,255,0.06) inset,
-        0 1px 0 #0f1014,
-        0 2px 8px rgba(0,0,0,0.25) !important;
+    transform: translateY(1px) !important;
 }
 
-/* Sidebar stock buttons */
 [data-testid="stSidebar"] .stButton > button {
-    background: #1e1f28 !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-radius: 8px !important;
-    color: rgba(255,255,255,0.4) !important;
+    background: rgba(10,12,28,0.6) !important;
+    backdrop-filter: blur(8px) !important;
+    border: 1px solid rgba(0,229,255,0.07) !important;
+    border-radius: 10px !important;
+    color: rgba(136,146,176,0.65) !important;
     font-size: 0.78rem !important;
     font-weight: 500 !important;
     text-align: left !important;
-    transition: all 0.15s ease !important;
+    transition: all 0.2s ease !important;
     padding: 9px 12px !important;
-    box-shadow: 0 2px 0 #0a0b0e, 0 3px 10px rgba(0,0,0,0.25) !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3) !important;
     transform: translateY(0) !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
-    background: #252630 !important;
-    border-color: rgba(0,210,106,0.25) !important;
-    color: #00d26a !important;
+    background: rgba(0,229,255,0.06) !important;
+    border-color: rgba(0,229,255,0.25) !important;
+    color: #00e5ff !important;
     transform: translateY(-1px) !important;
-    box-shadow: 0 3px 0 #0a0b0e, 0 5px 14px rgba(0,0,0,0.3) !important;
+    box-shadow: 0 0 16px rgba(0,229,255,0.08), 0 4px 14px rgba(0,0,0,0.35) !important;
 }
 [data-testid="stSidebar"] .stButton > button:active {
-    transform: translateY(1px) !important;
-    box-shadow: 0 1px 0 #0a0b0e, 0 2px 6px rgba(0,0,0,0.2) !important;
+    transform: translateY(0) !important;
 }
 
 /* ════════════════════════════════════════════════════
    EXPANDERS
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 .streamlit-expanderHeader, [data-testid="stExpander"] summary {
-    background: #1a1b22 !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-radius: 12px !important;
-    color: rgba(255,255,255,0.6) !important;
+    background: rgba(10,12,28,0.7) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(0,229,255,0.08) !important;
+    border-radius: 14px !important;
+    color: rgba(240,244,255,0.55) !important;
     font-weight: 600 !important;
     font-size: 0.85rem !important;
     padding: 14px 18px !important;
     transition: all 0.2s ease !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
 }
 .streamlit-expanderHeader:hover, [data-testid="stExpander"] summary:hover {
-    border-color: rgba(0,210,106,0.25) !important;
-    background: #1e1f28 !important;
-    color: #f0f0f5 !important;
+    border-color: rgba(0,229,255,0.2) !important;
+    background: rgba(0,229,255,0.04) !important;
+    color: #f0f4ff !important;
 }
 [data-testid="stExpander"] details[open] summary {
-    border-radius: 12px 12px 0 0 !important;
-    border-color: rgba(0,210,106,0.15) !important;
-    border-bottom-color: rgba(255,255,255,0.04) !important;
+    border-radius: 14px 14px 0 0 !important;
+    border-color: rgba(0,229,255,0.15) !important;
+    border-bottom-color: rgba(0,229,255,0.04) !important;
 }
 .streamlit-expanderContent, [data-testid="stExpander"] details > div {
-    background: #13141a !important;
-    border: 1px solid rgba(255,255,255,0.05) !important;
+    background: rgba(7,8,15,0.6) !important;
+    border: 1px solid rgba(0,229,255,0.06) !important;
     border-top: none !important;
-    border-radius: 0 0 12px 12px !important;
+    border-radius: 0 0 14px 14px !important;
     padding: 18px !important;
 }
 
 /* ════════════════════════════════════════════════════
    DATA TABLES
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 [data-testid="stDataFrame"] {
-    background: #1a1b22 !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-radius: 14px !important;
+    background: rgba(10,12,28,0.7) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(0,229,255,0.08) !important;
+    border-radius: 16px !important;
     overflow: hidden !important;
-    box-shadow: 0 6px 28px rgba(0,0,0,0.35) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45) !important;
 }
-[data-testid="stDataFrame"] iframe { border-radius: 14px !important; }
+[data-testid="stDataFrame"] iframe { border-radius: 16px !important; }
 
 /* ════════════════════════════════════════════════════
    INPUTS
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 .stTextInput input, .stTextArea textarea {
-    background: #13141a !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 10px !important;
-    color: #f0f0f5 !important;
+    background: rgba(10,12,28,0.8) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(0,229,255,0.1) !important;
+    border-radius: 12px !important;
+    color: #f0f4ff !important;
     font-size: 0.88rem !important;
-    transition: all 0.2s ease !important;
-    padding: 10px 14px !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2) inset !important;
+    transition: all 0.25s ease !important;
+    padding: 11px 15px !important;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3) inset !important;
 }
 .stTextInput input:focus, .stTextArea textarea:focus {
-    border-color: rgba(0,210,106,0.4) !important;
-    box-shadow: 0 0 0 3px rgba(0,210,106,0.06), 0 2px 8px rgba(0,0,0,0.2) inset !important;
+    border-color: rgba(0,229,255,0.4) !important;
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.07), 0 0 20px rgba(0,229,255,0.08),
+                0 2px 12px rgba(0,0,0,0.3) inset !important;
 }
 .stTextInput input::placeholder, .stTextArea textarea::placeholder {
-    color: rgba(255,255,255,0.18) !important;
+    color: rgba(136,146,176,0.35) !important;
 }
 
 /* ════════════════════════════════════════════════════
    SELECTBOX
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 .stSelectbox > div > div {
-    background: #13141a !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-    border-radius: 10px !important;
-    color: rgba(255,255,255,0.75) !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+    background: rgba(10,12,28,0.8) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(0,229,255,0.1) !important;
+    border-radius: 12px !important;
+    color: rgba(240,244,255,0.75) !important;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3) !important;
 }
 .stSelectbox > div > div:focus-within {
-    border-color: rgba(0,210,106,0.35) !important;
-    box-shadow: 0 0 0 3px rgba(0,210,106,0.06) !important;
+    border-color: rgba(0,229,255,0.35) !important;
+    box-shadow: 0 0 0 3px rgba(0,229,255,0.07) !important;
 }
 
 /* ════════════════════════════════════════════════════
    TOGGLE
-═══════════════════════════════════════════════════ */
-[data-baseweb="toggle"] > div { background: #00d26a !important; }
+════════════════════════════════════════════════════ */
+[data-baseweb="toggle"] > div { background: #00e5ff !important; }
 
 /* ════════════════════════════════════════════════════
    DIVIDERS
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 hr {
     border: none !important;
-    border-top: 1px solid rgba(255,255,255,0.05) !important;
+    border-top: 1px solid rgba(0,229,255,0.06) !important;
     margin: 1.5rem 0 !important;
 }
 
 /* ════════════════════════════════════════════════════
-   BADGES
-═══════════════════════════════════════════════════ */
+   RECOMMENDATION BADGES
+════════════════════════════════════════════════════ */
 .rec-badge {
     display: inline-block;
-    padding: 4px 13px;
+    padding: 4px 14px;
     border-radius: 20px;
     font-size: 0.67rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 1.5px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
 }
 .badge-sb {
-    background: rgba(0,210,106,0.14);
-    color: #00d26a;
-    border: 1px solid rgba(0,210,106,0.35);
-    box-shadow: 0 0 14px rgba(0,210,106,0.18), 0 2px 6px rgba(0,0,0,0.2);
+    background: rgba(16,255,176,0.1);
+    color: #10ffb0;
+    border: 1px solid rgba(16,255,176,0.35);
+    box-shadow: 0 0 16px rgba(16,255,176,0.2), 0 2px 8px rgba(0,0,0,0.3);
+    text-shadow: 0 0 10px rgba(16,255,176,0.6);
 }
 .badge-b {
-    background: rgba(0,210,106,0.07);
-    color: #00b558;
-    border: 1px solid rgba(0,210,106,0.2);
+    background: rgba(0,229,255,0.08);
+    color: #00e5ff;
+    border: 1px solid rgba(0,229,255,0.25);
+    box-shadow: 0 0 12px rgba(0,229,255,0.1);
 }
 .badge-w {
-    background: rgba(245,166,35,0.1);
-    color: #f5a623;
-    border: 1px solid rgba(245,166,35,0.28);
+    background: rgba(251,191,36,0.1);
+    color: #fbbf24;
+    border: 1px solid rgba(251,191,36,0.28);
 }
 .badge-n {
-    background: rgba(255,255,255,0.04);
-    color: rgba(255,255,255,0.3);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(136,146,176,0.06);
+    color: rgba(136,146,176,0.5);
+    border: 1px solid rgba(136,146,176,0.12);
 }
 .badge-av {
-    background: rgba(255,64,64,0.1);
-    color: #ff4040;
-    border: 1px solid rgba(255,64,64,0.28);
-    box-shadow: 0 0 12px rgba(255,64,64,0.1), 0 2px 6px rgba(0,0,0,0.2);
+    background: rgba(255,61,87,0.1);
+    color: #ff3d57;
+    border: 1px solid rgba(255,61,87,0.3);
+    box-shadow: 0 0 14px rgba(255,61,87,0.15);
+    text-shadow: 0 0 8px rgba(255,61,87,0.5);
 }
 
 /* ════════════════════════════════════════════════════
-   AI ADVISER — COCKPIT COMMAND CENTER
-═══════════════════════════════════════════════════ */
+   AI RESEARCH AGENT — COMMAND CENTER (the star)
+════════════════════════════════════════════════════ */
 .command-center-header {
-    background: linear-gradient(135deg, #16171f 0%, #1a1b24 100%);
-    border: 1px solid rgba(139,86,246,0.15);
-    border-radius: 18px;
+    background: rgba(10,12,28,0.9);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(168,85,247,0.22);
+    border-radius: 22px;
     text-align: center;
-    padding: 28px 32px 22px;
-    margin-bottom: 24px;
+    padding: 36px 40px 28px;
+    margin-bottom: 28px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 60px rgba(139,86,246,0.04);
+    box-shadow:
+        0 8px 48px rgba(0,0,0,0.55),
+        0 0 0 1px rgba(168,85,247,0.08) inset;
+    animation: glow-purple 4s ease-in-out infinite;
 }
 .command-center-header::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, transparent, #8b56f6 30%, #00d26a 70%, transparent);
+    background: linear-gradient(90deg,
+        transparent, #00e5ff 20%, #a855f7 50%, #10ffb0 80%, transparent);
+    background-size: 200% 100%;
+    animation: shimmer-text 5s linear infinite;
 }
 .command-center-header::after {
     content: '';
     position: absolute;
-    bottom: 0; left: 15%; right: 15%; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(139,86,246,0.3), transparent);
+    inset: 0;
+    background: radial-gradient(ellipse 60% 50% at 50% 0%,
+        rgba(168,85,247,0.07) 0%, transparent 70%);
+    pointer-events: none;
+}
+.cc-icon {
+    font-size: 2.2rem;
+    margin-bottom: 10px;
+    display: block;
+    animation: float-glow 3s ease-in-out infinite;
 }
 .cc-title {
-    font-size: 1rem;
-    font-weight: 800;
-    letter-spacing: 5px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: 4px;
     text-transform: uppercase;
-    color: #f0f0f5;
-    margin-bottom: 7px;
+    background: linear-gradient(90deg, #00e5ff 0%, #a855f7 50%, #10ffb0 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: shimmer-text 5s linear infinite;
+    margin-bottom: 10px;
 }
-.cc-title span { color: #8b56f6; }
 .cc-subtitle {
     font-size: 0.68rem;
-    color: rgba(255,255,255,0.25);
+    color: rgba(136,146,176,0.5);
     letter-spacing: 2.5px;
     text-transform: uppercase;
+    margin-bottom: 18px;
+}
+.cc-badges {
+    display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+}
+.cc-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 14px; border-radius: 20px;
+    font-size: 0.65rem; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase;
+}
+.cc-badge-groq {
+    background: rgba(0,229,255,0.08);
+    border: 1px solid rgba(0,229,255,0.2);
+    color: #00e5ff;
+}
+.cc-badge-grok {
+    background: rgba(168,85,247,0.08);
+    border: 1px solid rgba(168,85,247,0.2);
+    color: #a855f7;
+}
+.cc-badge-layers {
+    background: rgba(16,255,176,0.08);
+    border: 1px solid rgba(16,255,176,0.2);
+    color: #10ffb0;
 }
 
-.user-bubble {
-    background: linear-gradient(135deg, rgba(0,210,106,0.07) 0%, rgba(0,210,106,0.02) 100%);
-    border: 1px solid rgba(0,210,106,0.15);
-    border-left: 3px solid #00d26a;
-    border-radius: 0 14px 14px 0;
-    padding: 16px 20px;
-    margin-bottom: 12px;
-    color: rgba(255,255,255,0.8);
-    font-size: 0.9rem;
-    line-height: 1.65;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-    animation: float-up 0.28s ease;
+/* ── Chat messages via st.chat_message() ─────────── */
+[data-testid="stChatMessage"] {
+    background: rgba(10,12,28,0.6) !important;
+    backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(0,229,255,0.07) !important;
+    border-radius: 16px !important;
+    padding: 4px 8px !important;
+    margin-bottom: 12px !important;
+    animation: slide-up 0.3s ease !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3) !important;
+    transition: border-color 0.25s ease !important;
 }
-.ai-bubble {
-    background: linear-gradient(135deg, rgba(139,86,246,0.07) 0%, rgba(26,27,34,0.9) 100%);
-    border: 1px solid rgba(139,86,246,0.15);
-    border-left: 3px solid #8b56f6;
-    border-radius: 0 14px 14px 0;
-    padding: 20px 24px;
-    margin-bottom: 16px;
-    color: rgba(255,255,255,0.88);
-    font-size: 0.9rem;
-    line-height: 1.8;
-    box-shadow: 0 6px 28px rgba(0,0,0,0.28);
-    animation: float-up 0.28s ease;
+[data-testid="stChatMessage"]:hover {
+    border-color: rgba(0,229,255,0.16) !important;
 }
 
-/* Chat input — large glowing command bar */
+/* Markdown content inside AI messages */
+[data-testid="stChatMessage"] h3 {
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 1.0rem !important;
+    font-weight: 700 !important;
+    color: #00e5ff !important;
+    letter-spacing: 0.3px !important;
+    margin: 14px 0 6px 0 !important;
+    text-shadow: 0 0 20px rgba(0,229,255,0.4) !important;
+    border-bottom: none !important;
+    text-transform: none !important;
+}
+[data-testid="stChatMessage"] h2 {
+    font-family: 'Space Grotesk', sans-serif !important;
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    color: #a855f7 !important;
+    margin: 16px 0 8px 0 !important;
+    text-shadow: 0 0 20px rgba(168,85,247,0.4) !important;
+    border-bottom: none !important;
+    letter-spacing: 0 !important;
+    text-transform: none !important;
+}
+[data-testid="stChatMessage"] strong {
+    color: #f0f4ff !important;
+    font-weight: 700 !important;
+}
+[data-testid="stChatMessage"] hr {
+    border-color: rgba(168,85,247,0.2) !important;
+    margin: 10px 0 !important;
+}
+[data-testid="stChatMessage"] p {
+    color: rgba(240,244,255,0.85) !important;
+    line-height: 1.75 !important;
+    font-size: 0.9rem !important;
+}
+[data-testid="stChatMessage"] li {
+    color: rgba(240,244,255,0.8) !important;
+    line-height: 1.75 !important;
+    font-size: 0.9rem !important;
+}
+[data-testid="stChatMessage"] code {
+    background: rgba(0,229,255,0.08) !important;
+    color: #00e5ff !important;
+    border-radius: 4px !important;
+    padding: 1px 6px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.82rem !important;
+}
+
+/* ── Chat input — glowing purple command bar ──────── */
 [data-testid="stChatInput"] {
-    background: #13141a !important;
-    border: 1px solid rgba(139,86,246,0.2) !important;
-    border-radius: 14px !important;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.04) inset !important;
+    background: rgba(10,12,28,0.8) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(168,85,247,0.25) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4),
+                0 0 0 1px rgba(168,85,247,0.06) inset !important;
     transition: all 0.25s ease !important;
 }
 [data-testid="stChatInput"]:focus-within {
-    border-color: rgba(139,86,246,0.5) !important;
-    box-shadow: 0 0 0 3px rgba(139,86,246,0.07),
-                0 0 28px rgba(139,86,246,0.12),
-                0 4px 20px rgba(0,0,0,0.35) !important;
+    border-color: rgba(168,85,247,0.6) !important;
+    box-shadow: 0 0 0 3px rgba(168,85,247,0.08),
+                0 0 40px rgba(168,85,247,0.15),
+                0 4px 24px rgba(0,0,0,0.45) !important;
     animation: border-breathe 2.5s ease infinite !important;
 }
 [data-testid="stChatInput"] textarea {
-    min-height: 54px !important;
+    min-height: 56px !important;
     font-size: 0.95rem !important;
-    color: #f0f0f5 !important;
+    color: #f0f4ff !important;
     background: transparent !important;
     border: none !important;
     padding: 16px 18px !important;
 }
+[data-testid="stChatInput"] textarea::placeholder {
+    color: rgba(136,146,176,0.35) !important;
+}
 
 /* ════════════════════════════════════════════════════
    SIMPLE TIP BOX
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 .simple-tip {
-    background: linear-gradient(135deg, rgba(0,210,106,0.06) 0%, rgba(0,210,106,0.02) 100%);
-    border: 1px solid rgba(0,210,106,0.18);
-    border-radius: 14px;
-    padding: 16px 20px;
+    background: linear-gradient(135deg,
+        rgba(0,229,255,0.05) 0%, rgba(168,85,247,0.04) 100%);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0,229,255,0.14);
+    border-radius: 16px;
+    padding: 18px 22px;
     margin: 12px 0;
-    color: rgba(255,255,255,0.55);
+    color: rgba(136,146,176,0.85);
     font-size: 0.87rem;
-    line-height: 1.65;
+    line-height: 1.7;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
 }
 .simple-tip::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(0,210,106,0.45), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0,229,255,0.5), rgba(168,85,247,0.4), transparent);
 }
 
 /* ════════════════════════════════════════════════════
    PROGRESS BAR
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 .stProgress > div > div > div > div {
-    background: linear-gradient(90deg, #00d26a, #00a850) !important;
+    background: linear-gradient(90deg, #00e5ff, #a855f7) !important;
     border-radius: 4px !important;
-    box-shadow: 0 0 8px rgba(0,210,106,0.4) !important;
+    box-shadow: 0 0 10px rgba(0,229,255,0.35) !important;
 }
 
 /* ════════════════════════════════════════════════════
    ALERTS & NOTIFICATIONS
-═══════════════════════════════════════════════════ */
-div[data-baseweb="notification"] { border-radius: 12px !important; }
+════════════════════════════════════════════════════ */
+div[data-baseweb="notification"] { border-radius: 14px !important; }
 .stSuccess, div[data-testid="stAlert"][data-type="success"] {
-    background: rgba(0,210,106,0.07) !important;
-    border: 1px solid rgba(0,210,106,0.2) !important;
-    border-radius: 12px !important;
+    background: rgba(16,255,176,0.06) !important;
+    border: 1px solid rgba(16,255,176,0.2) !important;
+    border-radius: 14px !important;
 }
 .stInfo, div[data-testid="stAlert"][data-type="info"] {
-    background: rgba(139,86,246,0.07) !important;
-    border: 1px solid rgba(139,86,246,0.2) !important;
-    border-radius: 12px !important;
+    background: rgba(0,229,255,0.06) !important;
+    border: 1px solid rgba(0,229,255,0.18) !important;
+    border-radius: 14px !important;
 }
 .stWarning, div[data-testid="stAlert"][data-type="warning"] {
-    background: rgba(245,166,35,0.07) !important;
-    border: 1px solid rgba(245,166,35,0.22) !important;
-    border-radius: 12px !important;
+    background: rgba(249,115,22,0.07) !important;
+    border: 1px solid rgba(249,115,22,0.22) !important;
+    border-radius: 14px !important;
 }
 .stError, div[data-testid="stAlert"][data-type="error"] {
-    background: rgba(255,64,64,0.07) !important;
-    border: 1px solid rgba(255,64,64,0.22) !important;
-    border-radius: 12px !important;
+    background: rgba(255,61,87,0.07) !important;
+    border: 1px solid rgba(255,61,87,0.22) !important;
+    border-radius: 14px !important;
 }
 
 /* ════════════════════════════════════════════════════
    SPINNER & STATUS
-═══════════════════════════════════════════════════ */
-.stSpinner > div { border-top-color: #00d26a !important; }
+════════════════════════════════════════════════════ */
+.stSpinner > div { border-top-color: #00e5ff !important; }
 [data-testid="stStatus"] {
-    background: #1a1b22 !important;
-    border: 1px solid rgba(255,255,255,0.07) !important;
-    border-radius: 12px !important;
+    background: rgba(10,12,28,0.8) !important;
+    backdrop-filter: blur(12px) !important;
+    border: 1px solid rgba(0,229,255,0.08) !important;
+    border-radius: 14px !important;
 }
 
 /* ════════════════════════════════════════════════════
-   SECTION HEADERS h3
-═══════════════════════════════════════════════════ */
+   SECTION HEADERS h3 (main content areas)
+════════════════════════════════════════════════════ */
 .main h3 {
     font-size: 0.7rem !important;
     font-weight: 700 !important;
     letter-spacing: 3px !important;
     text-transform: uppercase !important;
-    color: rgba(255,255,255,0.2) !important;
+    color: rgba(136,146,176,0.32) !important;
     margin-bottom: 1rem !important;
     padding-bottom: 8px !important;
-    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+    border-bottom: 1px solid rgba(0,229,255,0.05) !important;
 }
 
 /* ════════════════════════════════════════════════════
    SCROLLBAR
-═══════════════════════════════════════════════════ */
+════════════════════════════════════════════════════ */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(0,210,106,0.3); }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); }
+::-webkit-scrollbar-thumb { background: rgba(0,229,255,0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,229,255,0.35); }
 
 /* ════════════════════════════════════════════════════
-   MOBILE — Phone-friendly responsive overrides
-   Breakpoints: ≤768px tablet/phone, ≤480px phone-only
-═══════════════════════════════════════════════════ */
-
-/* Prevent horizontal overflow on all screen sizes */
+   MOBILE RESPONSIVE
+════════════════════════════════════════════════════ */
 .stApp, .main, .block-container { overflow-x: hidden !important; }
 
 @media (max-width: 768px) {
-    /* Tighter content padding */
     .main .block-container {
         padding-left: 0.6rem !important;
         padding-right: 0.6rem !important;
         max-width: 100% !important;
     }
-
-    /* Header: wrap, hide nav pills */
     .qe-header {
         flex-wrap: wrap !important;
         height: auto !important;
@@ -760,9 +858,7 @@ div[data-baseweb="notification"] { border-radius: 12px !important; }
     .qe-meta { gap: 8px !important; }
     .qe-title { font-size: 0.82rem !important; letter-spacing: 1.5px !important; }
     .qe-subtitle { font-size: 0.52rem !important; letter-spacing: 1.2px !important; }
-    .qe-logo-mark { width: 30px !important; height: 30px !important; font-size: 0.75rem !important; }
-
-    /* VIX box: stack vertically */
+    .qe-logo-mark { width: 32px !important; height: 32px !important; font-size: 0.75rem !important; }
     .vix-container {
         flex-direction: column !important;
         gap: 12px !important;
@@ -770,13 +866,11 @@ div[data-baseweb="notification"] { border-radius: 12px !important; }
     }
     .vix-guide-panel {
         border-left: none !important;
-        border-top: 1px solid rgba(255,255,255,0.06) !important;
+        border-top: 1px solid rgba(0,229,255,0.06) !important;
         padding-left: 0 !important;
         padding-top: 12px !important;
         flex: unset !important;
     }
-
-    /* Tabs: horizontally scrollable, touch-friendly */
     .stTabs [data-baseweb="tab-list"] {
         overflow-x: auto !important;
         flex-wrap: nowrap !important;
@@ -790,86 +884,37 @@ div[data-baseweb="notification"] { border-radius: 12px !important; }
         white-space: nowrap !important;
         min-height: 40px !important;
     }
-
-    /* Touch-friendly buttons — minimum 44px tap target */
     .stButton > button {
         min-height: 44px !important;
         font-size: 0.8rem !important;
         width: 100% !important;
         touch-action: manipulation !important;
     }
-
-    /* Sidebar buttons full width */
-    [data-testid="stSidebar"] .stButton > button {
-        min-height: 42px !important;
-    }
-
-    /* Chat input — larger tap target */
+    [data-testid="stSidebar"] .stButton > button { min-height: 42px !important; }
     [data-testid="stChatInput"] textarea {
         min-height: 52px !important;
         font-size: 0.9rem !important;
         padding: 14px 16px !important;
     }
-
-    /* Metric cards — tighter on mobile */
-    [data-testid="stMetric"] {
-        padding: 14px 16px !important;
-    }
-    [data-testid="stMetricValue"] > div {
-        font-size: 1.35rem !important;
-        letter-spacing: -0.3px !important;
-    }
-
-    /* Data tables — allow horizontal scroll within */
-    [data-testid="stDataFrame"] {
-        overflow-x: auto !important;
-        -webkit-overflow-scrolling: touch !important;
-    }
-
-    /* Command center header */
-    .command-center-header {
-        padding: 16px 16px 14px !important;
-    }
-    .cc-title {
-        font-size: 0.85rem !important;
-        letter-spacing: 3px !important;
-    }
+    [data-testid="stMetric"] { padding: 14px 16px !important; }
+    [data-testid="stMetricValue"] > div { font-size: 1.35rem !important; letter-spacing: -0.3px !important; }
+    [data-testid="stDataFrame"] { overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; }
+    .command-center-header { padding: 20px 16px 16px !important; }
+    .cc-title { font-size: 1rem !important; letter-spacing: 2px !important; }
     .cc-subtitle { font-size: 0.6rem !important; letter-spacing: 1.5px !important; }
-
-    /* Chat bubbles */
-    .ai-bubble, .user-bubble {
-        padding: 12px 14px !important;
-        font-size: 0.85rem !important;
-        line-height: 1.65 !important;
-    }
-
-    /* Expanders */
-    .streamlit-expanderHeader, [data-testid="stExpander"] summary {
-        padding: 12px 14px !important;
-        font-size: 0.82rem !important;
-    }
-    [data-testid="stExpander"] details > div {
-        padding: 14px !important;
-    }
-
-    /* Simple tip box */
     .simple-tip { padding: 12px 14px !important; font-size: 0.83rem !important; }
-
-    /* Text inputs */
-    .stTextInput input, .stTextArea textarea {
-        font-size: 0.9rem !important;
-        padding: 12px 14px !important;
-    }
+    .stTextInput input, .stTextArea textarea { font-size: 0.9rem !important; padding: 12px 14px !important; }
+    [data-testid="stChatMessage"] { padding: 2px 4px !important; margin-bottom: 8px !important; }
+    [data-testid="stExpander"] summary { padding: 12px 14px !important; font-size: 0.82rem !important; }
+    [data-testid="stExpander"] details > div { padding: 14px !important; }
 }
 
 @media (max-width: 480px) {
-    /* Extra-small phones: single column feel for preset buttons */
-    .stTabs [data-baseweb="tab"] {
-        padding: 8px 10px !important;
-        font-size: 0.7rem !important;
-    }
+    .stTabs [data-baseweb="tab"] { padding: 8px 10px !important; font-size: 0.7rem !important; }
     [data-testid="stMetricValue"] > div { font-size: 1.2rem !important; }
     .qe-timestamp { display: none !important; }
+    .cc-badges { gap: 5px !important; }
+    .cc-badge { padding: 4px 10px !important; font-size: 0.6rem !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -896,14 +941,14 @@ st.markdown(f"""
     <div class="qe-brand">
         <div class="qe-logo-mark">QE</div>
         <div>
-            <div class="qe-title">QUANTUM <span>EDGE</span></div>
+            <div class="qe-title">QUANTUM EDGE</div>
             <div class="qe-subtitle">Institutional Intelligence &nbsp;·&nbsp; Signal Scanner &nbsp;·&nbsp; AI Adviser</div>
         </div>
     </div>
     <div class="qe-nav">
         <div class="qe-nav-pill active">Dashboard</div>
         <div class="qe-nav-pill">Scanner</div>
-        <div class="qe-nav-pill">AI Adviser</div>
+        <div class="qe-nav-pill">Research Agent</div>
     </div>
     <div class="qe-meta">
         <div class="qe-badge">
@@ -960,57 +1005,63 @@ _refresh_ttl_str = ("45s" if _mkt_status["open"] else "5m")
 
 st.markdown(f"""
 <div class="vix-container" style="
-    background: linear-gradient(135deg, #1a1b22 0%, #0f1014 100%);
-    border: 1px solid {_vix_color}44;
-    border-left: 4px solid {_vix_color};
-    border-radius: 12px;
-    padding: 18px 28px;
+    background: rgba(10,12,28,0.75);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid {_vix_color}40;
+    border-left: 3px solid {_vix_color};
+    border-radius: 16px;
+    padding: 20px 28px;
     display: flex;
     align-items: center;
     gap: 32px;
     margin-bottom: 6px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(0,229,255,0.04) inset;
+    position: relative;
+    overflow: hidden;
 ">
+    <div style="position:absolute;top:0;left:0;right:0;height:1px;
+                background:linear-gradient(90deg,transparent,{_vix_color}60,transparent);"></div>
     <div style="display:flex;flex-direction:column;min-width:140px;">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <span style="font-size:11px;font-weight:600;letter-spacing:2px;
-                         color:#8892a4;text-transform:uppercase;">
+            <span style="font-size:10px;font-weight:600;letter-spacing:2px;
+                         color:rgba(136,146,176,0.6);text-transform:uppercase;">
                 CBOE VIX  •  Fear Index
             </span>
             <span style="font-size:10px;font-weight:700;letter-spacing:1px;
-                         background:{_mkt_status['color']}22;
-                         border:1px solid {_mkt_status['color']}55;
+                         background:{_mkt_status['color']}18;
+                         border:1px solid {_mkt_status['color']}45;
                          color:{_mkt_status['color']};
                          padding:2px 8px;border-radius:20px;">
                 {_mkt_status['dot']} {_mkt_status['label']}
             </span>
         </div>
-        <div style="font-size:54px;font-weight:800;line-height:1;color:{_vix_color};
-                    font-family:'Inter',sans-serif;letter-spacing:-2px;">
+        <div style="font-size:52px;font-weight:800;line-height:1;color:{_vix_color};
+                    font-family:'Space Grotesk','Inter',sans-serif;letter-spacing:-2px;
+                    text-shadow:0 0 30px {_vix_color}60;">
             {_vix_display}
         </div>
-        <div style="margin-top:6px;display:flex;align-items:center;gap:10px;">
-            <span style="font-size:13px;font-weight:700;
-                         background:{_vix_color}22;border:1px solid {_vix_color}55;
-                         color:{_vix_color};padding:3px 10px;border-radius:20px;
-                         letter-spacing:1px;">
+        <div style="margin-top:8px;display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;font-weight:700;
+                         background:{_vix_color}15;border:1px solid {_vix_color}45;
+                         color:{_vix_color};padding:3px 10px;border-radius:20px;letter-spacing:1px;">
                 {_vix_tier} {_vix_label}
             </span>
-            <span style="font-size:12px;color:#8892a4;">
+            <span style="font-size:12px;color:rgba(136,146,176,0.6);">
                 {_vix_chg_str} ({_vix_chgp_str} today)
             </span>
         </div>
-        <div style="margin-top:5px;font-size:10px;color:#4a5568;">
+        <div style="margin-top:5px;font-size:10px;color:rgba(136,146,176,0.35);">
             Updated {_vix_as_of} &nbsp;•&nbsp; refreshes every {_refresh_ttl_str}
         </div>
     </div>
-    <div class="vix-guide-panel" style="flex:1;border-left:1px solid rgba(255,255,255,0.06);
-                padding-left:28px;font-size:12px;color:#8892a4;line-height:1.8;">
-        <b style="color:#f0f0f5;">VIX Guide</b><br>
-        <span style="color:#00d26a;">▪ &lt;15</span> Low Volatility — markets calm, options cheap<br>
-        <span style="color:#ffc107;">▪ 15–25</span> Normal range — typical trading environment<br>
-        <span style="color:#ff8c00;">▪ 25–30</span> Elevated — uncertainty rising, hedge cautiously<br>
-        <span style="color:#ff4040;">▪ &gt;30</span> High Fear — potential for sharp moves in both directions
+    <div class="vix-guide-panel" style="flex:1;border-left:1px solid rgba(0,229,255,0.08);
+                padding-left:28px;font-size:12px;color:rgba(136,146,176,0.7);line-height:1.9;">
+        <b style="color:#f0f4ff;font-family:'Space Grotesk',sans-serif;">VIX Guide</b><br>
+        <span style="color:#10ffb0;">▪ &lt;15</span> Low Volatility — markets calm, options cheap<br>
+        <span style="color:#fbbf24;">▪ 15–25</span> Normal range — typical trading environment<br>
+        <span style="color:#f97316;">▪ 25–30</span> Elevated — uncertainty rising, hedge cautiously<br>
+        <span style="color:#ff3d57;">▪ &gt;30</span> High Fear — potential for sharp moves in both directions
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1271,10 +1322,13 @@ tab_ai, tab_results, tab_whale, tab_news, tab_charts = st.tabs([
 with tab_ai:
     st.markdown("""
 <div class="command-center-header">
-    <div class="cc-title">🔬 AI Research Agent</div>
-    <div class="cc-subtitle">
-        Groq llama-3.3-70b &nbsp;•&nbsp; Grok xAI validation &nbsp;•&nbsp;
-        5-layer universe scan &nbsp;•&nbsp; Small / Mid / Large Cap
+    <span class="cc-icon">🔬</span>
+    <div class="cc-title">AI Research Agent</div>
+    <div class="cc-subtitle">Multi-layer intelligence &nbsp;·&nbsp; Institutional flow &nbsp;·&nbsp; Live market data</div>
+    <div class="cc-badges">
+        <span class="cc-badge cc-badge-groq">⚡ Groq llama-3.3-70b</span>
+        <span class="cc-badge cc-badge-grok">✦ Grok xAI validation</span>
+        <span class="cc-badge cc-badge-layers">◈ 5-layer scan</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1389,16 +1443,8 @@ with tab_ai:
 
     # ── Chat history ──────────────────────────────────────────────────────────
     for msg in st.session_state.chat_history:
-        if msg["role"] == "user":
-            st.markdown(
-                f'<div class="user-bubble">🙋 <b>You:</b> {msg["content"]}</div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown(
-                f'<div class="ai-bubble">🤖 <b>AI Adviser:</b><br><br>{msg["content"]}</div>',
-                unsafe_allow_html=True,
-            )
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
     # ── Input ─────────────────────────────────────────────────────────────────
     user_input = st.chat_input(
