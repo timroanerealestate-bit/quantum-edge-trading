@@ -29,19 +29,12 @@ from streamlit_autorefresh import st_autorefresh
 # Locally:  reads from .streamlit/secrets.toml
 # On Cloud: reads from Streamlit Cloud Settings → Secrets
 
-if "GROQ_API_KEY" not in st.secrets:
-    st.error(
-        "🔑 **Groq API key is missing.**\n\n"
-        "Add it in **Streamlit Cloud → your app → ⋮ → Settings → Secrets**:\n\n"
-        "```toml\n"
-        'GROQ_API_KEY          = "gsk_..."\n'
-        'ALPHA_VANTAGE_API_KEY = "..."\n'
-        'MARKETAUX_API_TOKEN   = "..."\n'
-        "```"
-    )
+GROQ_API_KEY = st.secrets.get("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    st.error("🔑 Groq API key is missing. Please add GROQ_API_KEY in Streamlit Cloud Settings → Secrets")
     st.stop()
 
-adviser.GROQ_API_KEY     = st.secrets["GROQ_API_KEY"]
+adviser.GROQ_API_KEY     = GROQ_API_KEY
 adviser.AV_API_KEY       = st.secrets.get("ALPHA_VANTAGE_API_KEY", "")
 adviser.MA_API_TOKEN     = st.secrets.get("MARKETAUX_API_TOKEN", "")
 adviser.FINNHUB_API_KEY  = st.secrets.get("FINNHUB_API_KEY", "")
