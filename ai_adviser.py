@@ -115,6 +115,7 @@ These blocks show the ACTUAL contracts trading RIGHT NOW from live market data.
 
 ✅ YOU MUST use ONLY these values for strikes, expiry dates, and premiums.
 ✅ The expiry dates listed are the real upcoming expirations — use ONLY those.
+✅ Write the FULL exact date in every card: "May 9, 2026" NOT "May 2026".
 ✅ The ask prices listed are live market prices — use those as your premium estimates.
 ❌ NEVER write any expiry date from 2024 or 2025 — those contracts are expired.
 ❌ NEVER invent a strike price, expiry date, or premium not present in the data.
@@ -162,7 +163,7 @@ Use this EXACT card format for every trade. Preserve all emoji, labels, and tabl
 |---|---|
 | **Current Price** | $[XX.XX] |
 | **Strike** | $[XX.XX] ([XX]% OTM) |
-| **Expiry** | [Month YYYY] |
+| **Expiry** | [Month DD, YYYY — exact date e.g. May 9, 2026] |
 | **Est. Premium** | $[X.XX] – $[X.XX] per share &nbsp;·&nbsp; $[XXX] – $[XXX] per contract |
 | **Upside at Target** | 🟢 +[XXX]% |
 | **Max Loss** | 🔴 100% of premium paid |
@@ -177,7 +178,7 @@ Use this EXACT card format for every trade. Preserve all emoji, labels, and tabl
 [2 sentences max. Be specific and honest. Name the exact scenario that kills this trade — e.g. earnings miss, sector rotation, IV crush, macro shock. Do NOT write generic boilerplate like "the stock could go down."]
 
 **Plain English Action**
-[One sentence. Tell the user exactly what to buy, at what strike, for which expiry, and roughly what it costs. Example: "Buy the March 2025 $180 Call on Meta (META) through any broker (Fidelity, Schwab, Robinhood) — expect to pay around $4.50 per share, or $450 per contract."]
+[One sentence. Tell the user exactly what to buy, at what strike, for which EXACT expiry date, and roughly what it costs. Example: "Buy the May 9, 2026 $180 Call on Meta (META) through any broker (Fidelity, Schwab, Robinhood) — expect to pay around $4.50 per share, or $450 per contract."]
 
 ---
 
@@ -209,7 +210,7 @@ Use this EXACT format for every LEAP:
 |---|---|
 | **Current Price** | $[XX.XX] |
 | **Strike** | $[XX.XX] ([XX]% OTM) |
-| **Expiry** | [Month YYYY — 6–18 months out] |
+| **Expiry** | [Month DD, YYYY — exact date, 6–18 months out e.g. January 16, 2028] |
 | **Est. Premium** | $[X.XX] – $[X.XX] per share &nbsp;·&nbsp; $[XXX] – $[XXX] per contract |
 | **Target Price at Expiry** | $[XX.XX] |
 | **Upside at Target** | 🟢 +[XXX]% |
