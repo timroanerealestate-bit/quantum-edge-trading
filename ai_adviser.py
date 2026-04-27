@@ -877,7 +877,7 @@ def _build_universe_context(screened: dict[str, list[dict]], vix_val: float | No
         if not rows:
             lines.append("  No data"); continue
 
-        for r in rows:
+        for r in rows[:3]:   # top 3 per tier keeps payload within Groq limits
             sym    = r["symbol"]
             conf   = r["confidence_label"]
             pct    = r["confidence_pct"]
@@ -926,25 +926,21 @@ def _build_universe_context(screened: dict[str, list[dict]], vix_val: float | No
             real_calls = opt.get("real_calls", [])
             real_puts  = opt.get("real_puts", [])
 
-            if expiries or real_calls or real_puts:
-                lines.append(f"    ┌─ LIVE OPTIONS (REAL DATA — use ONLY these values) ─────────────")
-                if expiries:
-                    lines.append(f"    │  Expiries available : {', '.join(expiries[:6])}")
-                for rc in real_calls:
+            if real_calls or real_puts:
+                lines.append(f"    ┌─ LIVE OPTIONS (use ONLY these values)")
+                for rc in real_calls[:1]:   # 1 call keeps payload small
                     lines.append(
-                        f"    │  CALL  strike=${rc['strike']:.2f} ({rc['otm_pct']:+.1f}% OTM)"
-                        f"  exp={rc['expiry']}  ask=${rc['ask']:.2f}  bid=${rc['bid']:.2f}"
-                        f"  vol={rc['volume']:,}  IV={rc['iv_pct']:.0f}%  breakeven=${rc['breakeven']:.2f}"
+                        f"    │  CALL  ${rc['strike']:.2f} ({rc['otm_pct']:+.1f}%OTM)"
+                        f"  exp={rc['expiry']}  ask=${rc['ask']:.2f}"
+                        f"  IV={rc['iv_pct']:.0f}%  beven=${rc['breakeven']:.2f}"
                     )
-                for rp in real_puts:
+                for rp in real_puts[:1]:    # 1 put keeps payload small
                     lines.append(
-                        f"    │  PUT   strike=${rp['strike']:.2f} ({rp['otm_pct']:+.1f}% OTM)"
-                        f"  exp={rp['expiry']}  ask=${rp['ask']:.2f}  bid=${rp['bid']:.2f}"
-                        f"  vol={rp['volume']:,}  IV={rp['iv_pct']:.0f}%  breakeven=${rp['breakeven']:.2f}"
+                        f"    │  PUT   ${rp['strike']:.2f} ({rp['otm_pct']:+.1f}%OTM)"
+                        f"  exp={rp['expiry']}  ask=${rp['ask']:.2f}"
+                        f"  IV={rp['iv_pct']:.0f}%  beven=${rp['breakeven']:.2f}"
                     )
-                if not real_calls and not real_puts:
-                    lines.append(f"    │  No liquid near-the-money contracts available at this time.")
-                lines.append(f"    └────────────────────────────────────────────────────────────────")
+                lines.append(f"    └────────────────────────────────────")
 
             lines.append("")
 
@@ -1129,6 +1125,9 @@ def _ask_groq_http(messages: list[dict], model: str, max_tokens: int = 3500) -> 
             if resp.status_code == 401:
                 _groq_last_err[0] = "invalid_key"
                 return ""            # wrong key — don't retry
+            if resp.status_code == 413:
+                _groq_last_err[0] = "payload_too_large"
+                return ""            # payload still too large — don't retry
             if resp.status_code == 429:
                 _groq_last_err[0] = "rate_limit"
                 time.sleep(1)
@@ -1213,6 +1212,12 @@ def ask_adviser(
         "\n\n[MODE: SIMPLE — plain English, analogies, explain every term]"
         if simple_mode else ""
     )
+
+    # Hard cap: universe context must not push the payload over Groq's limit.
+    # 20 000 chars ≈ 5 000 tokens — comfortably within free-tier limits.
+    _MAX_CTX = 20_000
+    if len(universe_ctx) > _MAX_CTX:
+        universe_ctx = universe_ctx[:_MAX_CTX] + "\n[context trimmed]"
 
     user_msg = f"""{watchlist_ctx}
 
