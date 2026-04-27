@@ -674,10 +674,15 @@ hr {
     border: 1px solid rgba(0,229,255,0.2);
     color: #00e5ff;
 }
-.cc-badge-grok {
+.cc-badge-deepseek {
     background: rgba(168,85,247,0.08);
     border: 1px solid rgba(168,85,247,0.2);
     color: #a855f7;
+}
+.cc-badge-gemini {
+    background: rgba(251,191,36,0.08);
+    border: 1px solid rgba(251,191,36,0.2);
+    color: #fbbf24;
 }
 .cc-badge-layers {
     background: rgba(16,255,176,0.08);
@@ -1575,10 +1580,11 @@ with tab_ai:
 <div class="command-center-header">
     <span class="cc-icon">🔬</span>
     <div class="cc-title">AI Research Agent</div>
-    <div class="cc-subtitle">Multi-layer intelligence &nbsp;·&nbsp; Institutional flow &nbsp;·&nbsp; Live market data</div>
+    <div class="cc-subtitle">5-layer validation &nbsp;·&nbsp; Institutional flow &nbsp;·&nbsp; Live options data</div>
     <div class="cc-badges">
         <span class="cc-badge cc-badge-groq">⚡ Groq llama-3.3-70b</span>
-        <span class="cc-badge cc-badge-grok">✦ Grok xAI validation</span>
+        <span class="cc-badge cc-badge-gemini">◆ Gemini 2.0 Flash fallback</span>
+        <span class="cc-badge cc-badge-deepseek">✦ DeepSeek validation</span>
         <span class="cc-badge cc-badge-layers">◈ 5-layer scan</span>
     </div>
 </div>
@@ -1714,7 +1720,7 @@ with tab_ai:
         def _progress(msg: str):
             _status_placeholder.info(msg)
 
-        with st.spinner("🔬 Research Agent — running multi-layer validation + Grok verification…"):
+        with st.spinner("🔬 Research Agent — running 5-layer validation + DeepSeek risk review…"):
             response = adviser.ask_adviser(
                 question     = active_q,
                 scan_results = results,
