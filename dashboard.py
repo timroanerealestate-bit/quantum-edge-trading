@@ -24,20 +24,25 @@ import market_data as md
 from options_analyzer import summarize_options
 
 # ─── API Key resolution ────────────────────────────────────────────────────────
-# Source 1: Streamlit secrets (works on Cloud AND locally via .streamlit/secrets.toml)
-# Source 2: Session state — key entered manually in sidebar
+# Order: Streamlit secrets → env var → session state (user-entered)
+import os as _os_keys
 
-_groq_key = st.secrets.get("GROQ_API_KEY", "")
-_av_key   = st.secrets.get("ALPHA_VANTAGE_API_KEY", "")
-_ma_key   = st.secrets.get("MARKETAUX_API_TOKEN", "")
+def _get_key(name: str) -> str:
+    # 1. Streamlit secrets panel (Cloud + local secrets.toml)
+    try:
+        v = st.secrets[name]
+        if v: return str(v).strip()
+    except Exception:
+        pass
+    # 2. Environment variable (.env locally)
+    v = _os_keys.getenv(name, "").strip()
+    if v: return v
+    # 3. Key entered manually by user this session
+    return st.session_state.get(f"_key_{name}", "")
 
-# If not in secrets, check if user entered it manually in the sidebar this session
-if not _groq_key:
-    _groq_key = st.session_state.get("_manual_groq_key", "")
-if not _av_key:
-    _av_key = st.session_state.get("_manual_av_key", "")
-if not _ma_key:
-    _ma_key = st.session_state.get("_manual_ma_key", "")
+_groq_key = _get_key("GROQ_API_KEY")
+_av_key   = _get_key("ALPHA_VANTAGE_API_KEY")
+_ma_key   = _get_key("MARKETAUX_API_TOKEN")
 
 adviser.GROQ_API_KEY = _groq_key
 adviser.AV_API_KEY   = _av_key
@@ -813,6 +818,36 @@ def _load_heatmap(_bucket: int):
     return md.get_heatmap_data()
 
 
+# ─── Groq key banner (shown when key not yet configured) ─────────────────────
+if not adviser.GROQ_API_KEY:
+    st.markdown("""
+<div style="background:rgba(139,86,246,0.1);border:1px solid rgba(139,86,246,0.35);
+border-left:4px solid #8b56f6;border-radius:12px;padding:18px 24px;margin-bottom:16px;">
+<div style="font-size:13px;font-weight:700;color:#8b56f6;margin-bottom:8px;">
+🔑 Research Agent Setup Required</div>
+<div style="font-size:12px;color:#8892a4;line-height:1.7;">
+Enter your Groq API key below to activate the 5-layer Research Agent.
+Your key is stored only for this session.
+</div>
+</div>
+""", unsafe_allow_html=True)
+    _k_col1, _k_col2 = st.columns([4, 1])
+    with _k_col1:
+        _entered_key = st.text_input(
+            "Groq API Key",
+            type="password",
+            placeholder="Paste your gsk_... key here",
+            label_visibility="collapsed",
+            key="groq_key_banner_input",
+        )
+    with _k_col2:
+        if st.button("✅ Activate", type="primary", width="stretch", key="groq_key_activate"):
+            if _entered_key.strip().startswith("gsk_"):
+                st.session_state["_key_GROQ_API_KEY"] = _entered_key.strip()
+                st.rerun()
+            else:
+                st.error("Key must start with gsk_")
+
 # ─── VIX Score box ────────────────────────────────────────────────────────────
 _mkt_status = md.get_market_status()
 _vix = _load_vix(_time_bucket(_vix_ttl()))
@@ -982,39 +1017,6 @@ def _render_options(opt: dict, simple: bool = False):
 with st.sidebar:
     st.markdown("## 📈 Training Bot")
 
-    # ── Groq API key status + manual fallback ─────────────────────────────────
-    if adviser.GROQ_API_KEY:
-        st.markdown(
-            "<div style='background:rgba(0,210,106,0.08);border:1px solid rgba(0,210,106,0.25);"
-            "border-radius:10px;padding:10px 14px;margin-bottom:12px;'>"
-            "<div style='font-size:11px;font-weight:700;color:#00d26a;letter-spacing:1px;'>"
-            "✅ Research Agent Ready</div></div>",
-            unsafe_allow_html=True,
-        )
-    else:
-        st.markdown(
-            "<div style='background:rgba(255,64,64,0.08);border:1px solid rgba(255,64,64,0.3);"
-            "border-radius:10px;padding:12px 14px;margin-bottom:8px;'>"
-            "<div style='font-size:11px;font-weight:700;color:#ff4040;letter-spacing:1px;"
-            "text-transform:uppercase;margin-bottom:4px;'>⚠ Groq Key Missing</div>"
-            "<div style='font-size:11px;color:#8892a4;line-height:1.5;'>"
-            "Enter your key below, or add it to<br>"
-            "<b style='color:#f0f0f5;'>Streamlit Cloud → Settings → Secrets</b></div></div>",
-            unsafe_allow_html=True,
-        )
-        _manual_key = st.text_input(
-            "Groq API Key",
-            type="password",
-            placeholder="gsk_...",
-            key="groq_key_input_field",
-        )
-        if st.button("🔑 Apply Key", width="stretch", key="apply_groq_key"):
-            if _manual_key.strip():
-                st.session_state["_manual_groq_key"] = _manual_key.strip()
-                st.rerun()
-            else:
-                st.error("Please paste a valid gsk_... key.")
-    st.divider()
 
     # ── Market status + refresh ───────────────────────────────────────────────
     _ms = md.get_market_status()
@@ -1348,11 +1350,8 @@ with tab_ai:
             st.rerun()
 
     # API key hint
-    if not adviser.HAS_GROQ or not adviser.GROQ_API_KEY:
-        st.warning(
-            "⚠️ **Groq API key not found.** "
-            "Paste your `gsk_...` key into the **sidebar** to activate the Research Agent instantly."
-        )
+    if not adviser.HAS_GROQ:
+        st.warning("⚠️ **Groq package not installed.** Run `pip install groq` to enable the Research Agent.")
 
 
 # ════════════════════════════════════════════════════════════════════════════════
