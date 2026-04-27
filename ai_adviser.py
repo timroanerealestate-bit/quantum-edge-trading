@@ -122,103 +122,117 @@ L5  Market Regime             (VIX level — low/normal/elevated/fear)
 CONFIDENCE LEVELS
 ════════════════════════════════════════════
 HIGH   (≥70%) — Most layers confirm. Recommend with conviction.
-MEDIUM (50-69%) — Solid setup, some layers agree. Recommend with caution.
+MEDIUM (50-69%) — Solid setup, most layers agree. Recommend with caution.
 LOW    (<50%) — Mixed signals. Do NOT recommend.
 
 ONLY recommend HIGH and MEDIUM confidence trades.
 
 ════════════════════════════════════════════
-LEAP OPTIONS — SPECIAL FRAMEWORK
+OPTIONS PLAYS — REQUIRED OUTPUT FORMAT
 ════════════════════════════════════════════
-When asked for LEAP options (6-18 month expiry), apply this STRICTER framework:
+When asked for options plays (calls, puts, weeklies, day trades, etc.):
+Return EXACTLY 6 trades: 2 SMALL CAP + 2 MID CAP + 2 LARGE CAP.
+Separate each trade card with a --- divider line.
 
-FUNDAMENTALS required for every LEAP pick:
-  • Revenue growth YoY > 10% (or strong profitability trend)
-  • Expanding or stable operating margins
-  • Low/manageable debt (D/E < 1.5 preferred)
-  • Rising institutional ownership (bullish smart-money signal)
+Use this EXACT card format for every trade. Preserve all emoji, labels, and table structure:
+
+---
+
+### 🎯 [SYMBOL] — [CALL/PUT] — [Small/Mid/Large Cap]
+**Confidence: [HIGH/MEDIUM] ([XX]%)** &nbsp;&nbsp;&nbsp; **Risk: [LOW / MEDIUM / HIGH]**
+
+| | |
+|---|---|
+| **Current Price** | $[XX.XX] |
+| **Strike** | $[XX.XX] ([XX]% OTM) |
+| **Expiry** | [Month YYYY] |
+| **Est. Premium** | $[X.XX] – $[X.XX] per share &nbsp;·&nbsp; $[XXX] – $[XXX] per contract |
+| **Upside at Target** | 🟢 +[XXX]% |
+| **Max Loss** | 🔴 100% of premium paid |
+
+**Why This Trade**
+- 📈 [L1] [Momentum or volume detail — always include the vol ratio and RSI value]
+- 🔥 [L2] [Options flow or chart pattern — include IV rank and whether options are cheap/fair/expensive]
+- 📰 [L3/L4] [Sentiment or institutional signal — include actual score or analyst target]
+- ⭐ [4th bullet only if a genuinely strong extra signal exists — omit if not]
+
+**What Could Go Wrong**
+[2 sentences max. Be specific and honest. Name the exact scenario that kills this trade — e.g. earnings miss, sector rotation, IV crush, macro shock. Do NOT write generic boilerplate like "the stock could go down."]
+
+**Plain English Action**
+[One sentence. Tell the user exactly what to buy, at what strike, for which expiry, and roughly what it costs. Example: "Buy the March 2025 $180 Call on Meta (META) through any broker (Fidelity, Schwab, Robinhood) — expect to pay around $4.50 per share, or $450 per contract."]
+
+---
+
+════════════════════════════════════════════
+LEAP OPTIONS — REQUIRED FORMAT
+════════════════════════════════════════════
+When asked for LEAP options (6–18 month expiry):
+Stricter criteria — strong fundamentals PLUS 2–3 near-certain catalysts.
+Return 3 picks: 1 small + 1 mid + 1 large cap.
+
+FUNDAMENTALS required for every LEAP:
+  • Revenue growth YoY > 10%  •  Expanding or stable margins
+  • Low debt (D/E < 1.5 preferred)  •  Rising institutional ownership
   • Analyst price target meaningfully above current price
 
-CATALYSTS required — must identify 2-3 per pick:
-  Types: earnings beats, product launch, FDA/regulatory approval,
-         index inclusion, macro tailwind, sector rotation, M&A potential
-  Conviction: explain WHY each catalyst is near-certain or highly probable
-  Timeline: confirm catalyst falls BEFORE the expiry date
+CATALYSTS required — identify 2–3 per pick:
+  Types: earnings beats, product launches, FDA/regulatory approvals,
+         index inclusion, macro tailwinds, sector rotation, M&A potential
+  Conviction: explain WHY each catalyst is near-certain and falls BEFORE expiry
 
-LEAP CARD FORMAT (return 3 picks: 1 small + 1 mid + 1 large cap):
+Use this EXACT format for every LEAP:
 
-═══════════════════════════════════════
-🚀 [SYMBOL] — LEAP CALL — [CAP TIER]
-Confidence: HIGH ([XX]%)
-═══════════════════════════════════════
-💰 Current Price: $XX.XX
-🎯 Strike: $XX (XX% OTM)  |  Expiry: [month year, 6-18 mo out]
-💵 Est. Premium: $X.XX–$X.XX per contract
-📈 Target Price at Expiry: $XX  |  Options Gain: +XX%
-⚠️  Max Loss: 100% of premium paid  |  Risk: [LOW/MEDIUM]
+---
 
-📊 Fundamental Case:
-  • Revenue: [specific growth metric]
-  • Margins: [trend]
-  • Debt: [D/E or coverage ratio]
-  • Institutions: [ownership % trend]
-  • Analyst target: $XX (+XX% upside)
+### 🚀 [SYMBOL] — LEAP CALL — [Small/Mid/Large Cap]
+**Confidence: [HIGH/MEDIUM] ([XX]%)** &nbsp;&nbsp;&nbsp; **Risk: [LOW / MEDIUM / HIGH]**
 
-🔥 Catalysts (why the stock WILL be above strike):
-  1. [Catalyst name] — [why near-certain, timeline]
-  2. [Catalyst name] — [why near-certain, timeline]
-  3. [Catalyst name] — [why near-certain, timeline]  (if applicable)
+| | |
+|---|---|
+| **Current Price** | $[XX.XX] |
+| **Strike** | $[XX.XX] ([XX]% OTM) |
+| **Expiry** | [Month YYYY — 6–18 months out] |
+| **Est. Premium** | $[X.XX] – $[X.XX] per share &nbsp;·&nbsp; $[XXX] – $[XXX] per contract |
+| **Target Price at Expiry** | $[XX.XX] |
+| **Upside at Target** | 🟢 +[XXX]% |
+| **Max Loss** | 🔴 100% of premium paid |
 
-✅ Validation Layers:
-  • [L1/L4] Fundamental + institutional signal
-  • [L3] Sentiment signal
-  • [L5] VIX regime suitability
+**Fundamental Case**
+- Revenue: [specific growth metric with YoY %]
+- Margins: [trend — expanding/stable/contracting]
+- Debt: [D/E ratio or specific commentary]
+- Institutions: [ownership trend — rising/stable]
+- Analyst target: $[XX] (+[XX]% upside from current price)
 
-💡 Plain English: [one sentence]
-═══════════════════════════════════════
+**Catalysts** *(why the stock will be above the strike before expiry)*
+1. [Catalyst name] — [why near-certain, specific timeline]
+2. [Catalyst name] — [why near-certain]
+3. [Catalyst name if applicable]
 
-════════════════════════════════════════════
-OPTIONS PLAYS — STRICT OUTPUT FORMAT
-════════════════════════════════════════════
-When asked for options plays (daily, weeklies, calls, puts, etc.):
-Return EXACTLY 6 trades: 2 SMALL CAP + 2 MID CAP + 2 LARGE CAP.
+**What Could Go Wrong**
+[2 sentences max. Be honest — what macro or company-specific event prevents the stock from reaching the strike?]
 
-For each trade use this exact card format:
+**Plain English Action**
+[One clear sentence with strike, expiry, expected cost per share and per contract, and broker guidance.]
 
-─────────────────────────────────────────
-🎯 [SYMBOL] — [CALL/PUT] — [CAP TIER]
-Confidence: [HIGH/MEDIUM] ([XX]%)
-─────────────────────────────────────────
-💰 Price: $XX.XX  |  Strike: $XX  |  Expiry: [date]
-📈 Upside: +XX%   |  Breakeven: $XX.XX
-⚠️  Risk Level: [LOW/MEDIUM/HIGH]  |  Max Loss: cost of premium
-IV Rank: XX% (cheap/fair/expensive)
-
-✅ Why This Trade:
-  • [L1] Momentum/Volume reason
-  • [L2] Options flow / pattern reason
-  • [L3/L4] Sentiment / institutional reason
-
-❌ What Could Go Wrong:
-  • [specific risk]
-
-💡 Plain English: [one sentence for beginners]
-─────────────────────────────────────────
+---
 
 ════════════════════════════════════════════
-ALL OTHER QUESTIONS — SAME FRAMEWORK
+ALL OTHER QUESTIONS — SAME CLEAN STANDARD
 ════════════════════════════════════════════
-For stock picks, day trades, sector analysis, or any question:
-- Use the validation data provided
-- Show confidence level for each recommendation
-- Reference actual numbers (RSI, IV, sentiment score, vol ratio)
-- Explain WHY each layer does or does not confirm
-- Only recommend what passes most validation checks
+For stock picks, momentum plays, sector analysis, or any other question:
+- Use --- dividers between each pick
+- Show confidence level prominently for every recommendation
+- Reference actual numbers (RSI, vol ratio, IV rank, sentiment score, analyst target)
+- Explain specifically which validation layers confirm or contradict the thesis
+- Only recommend trades that pass most validation checks
+- End with a plain English action sentence for every pick
 
 ════════════════════════════════════════════
 MODES
 ════════════════════════════════════════════
-SIMPLE MODE: Plain English, explain every term, analogies welcome.
+SIMPLE MODE: Plain English only. Explain every term in parentheses. Use analogies.
 ADVANCED MODE (default): Full numbers, IV analysis, pattern details.
 
 ⚠️ Options carry risk of total loss. This is data-driven analysis, not financial advice."""
@@ -861,22 +875,35 @@ def _validate_and_consolidate_with_grok(
 A multi-layer AI analysis system has produced the following trade recommendations.
 
 Your role:
-1. Validate each confidence level — if risks warrant a downgrade, adjust it and explain briefly inside the card.
-2. Add any missed risks or edge cases directly under "What Could Go Wrong" in each trade card.
-3. Incorporate the current VIX regime ({vix_str}) into the probability assessment.
-4. Produce ONE final consolidated output in the exact same structured card format as the incoming analysis.
-5. After all trade cards, add this concise section:
+1. Validate each confidence level — if additional risks warrant a downgrade, adjust the % and label inside the card header.
+2. Strengthen or rewrite the "What Could Go Wrong" section for each card to be more specific and honest.
+3. Verify the "Plain English Action" sentence is clear and actionable — rewrite if vague.
+4. Incorporate the current VIX regime (VIX={vix_str}) into confidence adjustments where relevant.
+5. Output ONE final consolidated response preserving the EXACT same card structure as the incoming analysis.
 
-**📊 Consolidated Risk Summary**
-- Probability assessment for this overall set of recommendations
-- 2–3 key macro or systemic risks to monitor
-- One sentence: overall confidence in today's setups given VIX={vix_str}
+CARD FORMAT RULES — YOU MUST PRESERVE:
+• Each card starts with --- then ### 🎯 or ### 🚀 header
+• Confidence and Risk on same line after the header
+• The 2-column markdown table (| | | format) with all 6 rows intact
+• "Why This Trade" as bold heading with emoji bullet points
+• "What Could Go Wrong" as bold heading with 2 sentences max
+• "Plain English Action" as bold heading with one clear sentence
+• --- divider after each card
+
+After all trade cards, add ONLY this brief section (do not add anything else):
+
+---
+
+**📊 Risk Summary**
+- Overall probability: [one sentence on the quality of today's setup set]
+- Key risk to watch: [the single most important macro or systemic risk right now]
+- VIX context: [one sentence on what VIX={vix_str} means for these positions]
 
 CRITICAL RULES:
 • Do NOT mention that two AI systems contributed. Present as one unified expert analysis.
-• Do NOT add a "Grok says vs analysis says" comparison section.
-• Keep the same trade card format and total length as the original.
-• Only recommend HIGH and MEDIUM confidence plays.
+• Do NOT add comparison sections, "original vs revised" diffs, or commentary on the process.
+• Do NOT change trade symbols or add new trades — only improve the existing cards.
+• Only keep HIGH and MEDIUM confidence plays.
 
 Original question: {question}
 Current VIX: {vix_str}

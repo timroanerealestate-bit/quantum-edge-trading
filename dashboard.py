@@ -714,6 +714,45 @@ hr {
     font-size: 0.82rem !important;
 }
 
+/* Trade card data table */
+[data-testid="stChatMessage"] table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 10px 0 16px 0 !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    background: rgba(7,8,15,0.5) !important;
+    border: 1px solid rgba(0,229,255,0.08) !important;
+}
+[data-testid="stChatMessage"] thead { display: none !important; }
+[data-testid="stChatMessage"] td {
+    padding: 9px 16px !important;
+    border-bottom: 1px solid rgba(0,229,255,0.05) !important;
+    font-size: 0.87rem !important;
+    line-height: 1.5 !important;
+    vertical-align: middle !important;
+}
+[data-testid="stChatMessage"] td:first-child {
+    color: rgba(136,146,176,0.65) !important;
+    font-size: 0.8rem !important;
+    font-weight: 600 !important;
+    white-space: nowrap !important;
+    width: 190px !important;
+    min-width: 140px !important;
+}
+[data-testid="stChatMessage"] td:last-child {
+    color: #f0f4ff !important;
+    font-weight: 600 !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-size: 0.84rem !important;
+}
+[data-testid="stChatMessage"] tr:last-child td {
+    border-bottom: none !important;
+}
+[data-testid="stChatMessage"] tr:hover td {
+    background: rgba(0,229,255,0.03) !important;
+}
+
 /* ── Chat input — glowing purple command bar ──────── */
 [data-testid="stChatInput"] {
     background: rgba(10,12,28,0.8) !important;
@@ -1444,7 +1483,7 @@ with tab_ai:
     # ── Chat history ──────────────────────────────────────────────────────────
     for msg in st.session_state.chat_history:
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            st.markdown(msg["content"], unsafe_allow_html=True)
 
     # ── Input ─────────────────────────────────────────────────────────────────
     user_input = st.chat_input(
