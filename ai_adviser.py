@@ -1087,6 +1087,10 @@ Current VIX: {vix_str}
         return groq_analysis + f"\n\n*⚡ Grok risk layer temporarily unavailable: {e}*"
 
 
+# Module-level slot that captures the last Groq failure reason.
+# ask_adviser reads it to show a specific error when all fallbacks are exhausted.
+_groq_last_err: list[str] = [""]
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # GROQ HTTP  (bypasses the groq package — works on any environment)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1095,29 +1099,48 @@ def _ask_groq_http(messages: list[dict], model: str, max_tokens: int = 3500) -> 
     Call Groq via its OpenAI-compatible REST API using requests.
     Bypasses the groq SDK entirely — no package dependency issues.
     Returns empty string on any failure — never raises.
+    Stores the failure reason in _groq_last_err[0] for diagnostics.
     """
     key = GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
     if not key:
+        _groq_last_err[0] = "no_key"
         return ""
-    try:
-        resp = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {key}",
-                "Content-Type":  "application/json",
-            },
-            json={
-                "model":       model,
-                "messages":    messages,
-                "max_tokens":  max_tokens,
-                "temperature": 0.4,
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"] or ""
-    except Exception:
-        return ""
+    _groq_last_err[0] = ""
+    # Try the requested model; on rate-limit retry once with the fast model
+    models_to_try = [model]
+    if model != GROQ_MODEL_FAST:
+        models_to_try.append(GROQ_MODEL_FAST)
+    for attempt_model in models_to_try:
+        try:
+            resp = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {key}",
+                    "Content-Type":  "application/json",
+                },
+                json={
+                    "model":       attempt_model,
+                    "messages":    messages,
+                    "max_tokens":  max_tokens,
+                    "temperature": 0.4,
+                },
+                timeout=60,
+            )
+            if resp.status_code == 401:
+                _groq_last_err[0] = "invalid_key"
+                return ""            # wrong key — don't retry
+            if resp.status_code == 429:
+                _groq_last_err[0] = "rate_limit"
+                time.sleep(1)
+                continue             # try next model
+            resp.raise_for_status()
+            text = resp.json()["choices"][0]["message"]["content"] or ""
+            if text:
+                _groq_last_err[0] = ""
+                return text
+        except Exception as exc:
+            _groq_last_err[0] = str(exc)[:120]
+    return ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1212,6 +1235,32 @@ My question: {question}{mode_tag}"""
         ai_text = _ask_gemini(messages)
 
     if not ai_text:
+        # Surface the real reason rather than the generic "AI key required" message
+        err = _groq_last_err[0]
+        if err == "invalid_key":
+            return (
+                "⚠️ **Groq API key rejected (HTTP 401).** "
+                "The key in your Streamlit Secrets appears to be invalid or expired. "
+                "Please generate a fresh key at [console.groq.com](https://console.groq.com) "
+                "and update `GROQ_API_KEY` in Streamlit Cloud → Settings → Secrets."
+            )
+        if err == "rate_limit":
+            return (
+                "⚠️ **Groq rate limit reached.** "
+                "Both available models are currently throttled. "
+                "Please wait 30 seconds and try again, or add a `GEMINI_API_KEY` "
+                "in Streamlit Secrets as a backup provider."
+            )
+        if err == "no_key":
+            return (
+                "⚠️ **No Groq API key found.** "
+                "Add `GROQ_API_KEY` in Streamlit Cloud → Settings → Secrets."
+            )
+        if err:
+            return (
+                f"⚠️ **AI provider error:** `{err}` — "
+                "If this persists, add a `GEMINI_API_KEY` in Streamlit Secrets as a backup."
+            )
         return _rule_based_response(question, scan_results, simple_mode)
 
     # ── Grok xAI validation layer (unchanged) ────────────────────────────────
