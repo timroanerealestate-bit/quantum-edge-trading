@@ -1240,33 +1240,10 @@ My question: {question}{mode_tag}"""
         ai_text = _ask_gemini(messages)
 
     if not ai_text:
-        # Surface the real reason rather than the generic "AI key required" message
-        err = _groq_last_err[0]
-        if err == "invalid_key":
-            return (
-                "⚠️ **Groq API key rejected (HTTP 401).** "
-                "The key in your Streamlit Secrets appears to be invalid or expired. "
-                "Please generate a fresh key at [console.groq.com](https://console.groq.com) "
-                "and update `GROQ_API_KEY` in Streamlit Cloud → Settings → Secrets."
-            )
-        if err == "rate_limit":
-            return (
-                "⚠️ **Groq rate limit reached.** "
-                "Both available models are currently throttled. "
-                "Please wait 30 seconds and try again, or add a `GEMINI_API_KEY` "
-                "in Streamlit Secrets as a backup provider."
-            )
-        if err == "no_key":
-            return (
-                "⚠️ **No Groq API key found.** "
-                "Add `GROQ_API_KEY` in Streamlit Cloud → Settings → Secrets."
-            )
-        if err:
-            return (
-                f"⚠️ **AI provider error:** `{err}` — "
-                "If this persists, add a `GEMINI_API_KEY` in Streamlit Secrets as a backup."
-            )
-        return _rule_based_response(question, scan_results, simple_mode)
+        return (
+            "⚠️ The AI provider is temporarily unavailable. "
+            "Please try again in a moment."
+        )
 
     # ── Grok xAI validation layer (unchanged) ────────────────────────────────
     if HAS_GROK_LAYER and GROK_API_KEY:
