@@ -254,6 +254,47 @@ ADVANCED MODE (default): Full numbers, IV analysis, pattern details.
 ⚠️ Options carry risk of total loss. This is data-driven analysis, not financial advice."""
 
 
+# Compact system prompt used for Groq calls only — keeps the JSON payload
+# small enough to avoid Groq free-tier 413 errors. Gemini gets the full prompt.
+_GROQ_COMPACT_SYSTEM = """You are an elite AI Trading Research Agent for Quantum Edge Trading.
+
+CRITICAL — OPTIONS DATA:
+• Use ONLY the LIVE OPTIONS block values for every strike, expiry, and premium.
+• Write FULL exact dates: "May 9, 2026" NOT "May 2026". Never use 2024/2025 dates.
+• Never fabricate strikes, dates, or premiums not present in the data.
+• Skip any symbol that has no LIVE OPTIONS block — do not invent numbers.
+
+OUTPUT: Exactly 6 trades — 2 small cap + 2 mid cap + 2 large cap.
+Use --- dividers. Only recommend HIGH (≥70%) and MEDIUM (50–69%) confidence trades.
+
+Card format for every trade:
+---
+### 🎯 [SYMBOL] — [CALL/PUT] — [Small/Mid/Large Cap]
+**Confidence: [HIGH/MEDIUM] ([XX]%)** &nbsp;&nbsp;&nbsp; **Risk: [LOW/MEDIUM/HIGH]**
+| | |
+|---|---|
+| **Current Price** | $[XX.XX] |
+| **Strike** | $[XX.XX] ([XX]% OTM) |
+| **Expiry** | [Month DD, YYYY] |
+| **Est. Premium** | $[X.XX]–$[X.XX] per share · $[XXX]–$[XXX] per contract |
+| **Upside at Target** | 🟢 +[XXX]% |
+| **Max Loss** | 🔴 100% of premium paid |
+
+**Why This Trade**
+- 📈 [L1] momentum — include vol ratio and RSI value
+- 🔥 [L2] options flow or chart pattern — include IV rank
+- 📰 [L3/L4] sentiment or institutional signal
+
+**What Could Go Wrong**
+[2 sentences max. Be specific — name the exact scenario that kills this trade.]
+
+**Plain English Action**
+[One sentence: what to buy, strike, exact expiry date, approximate cost.]
+---
+
+⚠️ Options carry risk of total loss. This is analysis, not financial advice."""
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # LAYER 1 — Price, volume, RSI  (batch yfinance)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1051,9 +1092,9 @@ Current VIX: {vix_str}
     return main_analysis
 
 
-# Module-level slot that captures the last Groq failure reason.
-# ask_adviser reads it to show a specific error when all fallbacks are exhausted.
-_groq_last_err: list[str] = [""]
+# Module-level slots that capture the last failure reason for each provider.
+_groq_last_err:   list[str] = [""]
+_gemini_last_err: list[str] = [""]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GROQ HTTP  (bypasses the groq package — works on any environment)
@@ -1121,7 +1162,9 @@ def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
     """
     key = GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
     if not key:
+        _gemini_last_err[0] = "no_key"
         return ""
+    _gemini_last_err[0] = ""
 
     system_text = next(
         (m["content"] for m in messages if m["role"] == "system"), ""
@@ -1164,7 +1207,8 @@ def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
             text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
             if text:
                 return text
-        except Exception:
+        except Exception as _ge:
+            _gemini_last_err[0] = str(_ge)[:120]
             continue
     return ""
 
@@ -1213,7 +1257,20 @@ def ask_adviser(
     if len(universe_ctx) > _MAX_CTX:
         universe_ctx = universe_ctx[:_MAX_CTX] + "\n[context trimmed]"
 
-    def _build_messages(ctx: str) -> list[dict]:
+    def _build_groq_messages(ctx: str) -> list[dict]:
+        """Compact system prompt keeps Groq payload under free-tier limits."""
+        user_msg = f"""{watchlist_ctx}
+
+{ctx}
+
+My question: {question}{mode_tag}"""
+        return [
+            {"role": "system", "content": _GROQ_COMPACT_SYSTEM},
+            {"role": "user",   "content": user_msg},
+        ]
+
+    def _build_gemini_messages(ctx: str) -> list[dict]:
+        """Full system prompt for Gemini (no payload size constraint)."""
         user_msg = f"""{watchlist_ctx}
 
 {ctx}
@@ -1224,33 +1281,38 @@ My question: {question}{mode_tag}"""
             {"role": "user",   "content": user_msg},
         ]
 
-    messages   = _build_messages(universe_ctx)
-    groq_model = _pick_groq_model(question)
+    groq_messages   = _build_groq_messages(universe_ctx)
+    gemini_messages = _build_gemini_messages(universe_ctx)
+    groq_model      = _pick_groq_model(question)
 
-    # ── Try Groq via HTTP (no SDK dependency) ─────────────────────────────────
-    ai_text = _ask_groq_http(messages, groq_model)
+    # ── Try Groq via HTTP (compact prompt, no SDK dependency) ─────────────────
+    ai_text = _ask_groq_http(groq_messages, groq_model)
 
-    # If Groq returned 413 (payload too large), halve the context and retry once
+    # If Groq returned 413 still, halve context and retry once
     if not ai_text and _groq_last_err[0] == "payload_too_large":
-        universe_ctx = universe_ctx[:_MAX_CTX // 2] + "\n[context trimmed]"
-        messages     = _build_messages(universe_ctx)
-        ai_text      = _ask_groq_http(messages, groq_model)
+        trimmed_ctx     = universe_ctx[:6_000] + "\n[context trimmed]"
+        groq_messages   = _build_groq_messages(trimmed_ctx)
+        gemini_messages = _build_gemini_messages(trimmed_ctx)
+        ai_text         = _ask_groq_http(groq_messages, groq_model)
 
-    # ── Silent fallback: Gemini ───────────────────────────────────────────────
+    # ── Silent fallback: Gemini (full prompt, higher limits) ──────────────────
     if not ai_text:
-        ai_text = _ask_gemini(messages)
+        ai_text = _ask_gemini(gemini_messages)
 
     if not ai_text:
         # ── Temporary diagnostics — remove once root cause confirmed ─────────
         _groq_key_present   = bool(GROQ_API_KEY or os.environ.get("GROQ_API_KEY", ""))
         _gemini_key_present = bool(GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", ""))
         _ctx_len            = len(universe_ctx)
+        _sys_len            = len(_GROQ_COMPACT_SYSTEM)
         return (
             f"⚠️ **Debug — both providers failed.**\n\n"
             f"- Groq key present: `{_groq_key_present}`\n"
             f"- Gemini key present: `{_gemini_key_present}`\n"
             f"- Groq last error: `{_groq_last_err[0] or 'none'}`\n"
+            f"- Gemini last error: `{_gemini_last_err[0] or 'none'}`\n"
             f"- Universe context length: `{_ctx_len:,}` chars\n"
+            f"- Compact system prompt length: `{_sys_len:,}` chars\n"
             f"- Groq model attempted: `{groq_model}`\n"
         )
 
