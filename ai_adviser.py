@@ -51,18 +51,7 @@ HAS_GROQ = _GROQ_INSTALLED  # True when package is installed; key injected at ru
 # ── Grok (xAI) — secondary validation + consolidation layer ──────────────────
 # Key injected by dashboard.py from st.secrets["GROK_API_KEY"].
 # Uses the OpenAI-compatible client pointing to api.x.ai.
-GROK_API_KEY  = ""
-GROK_MODEL    = "grok-beta"
-GROK_BASE_URL = "https://api.x.ai/v1"
-
-try:
-    from openai import OpenAI as _OpenAI
-    _OPENAI_INSTALLED = True
-except ImportError:
-    _OpenAI = None
-    _OPENAI_INSTALLED = False
-
-HAS_GROK_LAYER = _OPENAI_INSTALLED  # True when openai pkg installed; key injected at runtime
+DEEPSEEK_API_KEY  = ""   # injected by dashboard.py; DeepSeek final validation layer
 
 
 # ── Stock universe ────────────────────────────────────────────────────────────
@@ -995,92 +984,71 @@ def _build_context(scan_results: list[dict], options_data: dict | None = None) -
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# GROK VALIDATION + CONSOLIDATION
+# DEEPSEEK FINAL VALIDATION LAYER
 # ═══════════════════════════════════════════════════════════════════════════════
-def _validate_and_consolidate_with_grok(
-    groq_analysis: str,
+def _validate_with_deepseek(
+    main_analysis: str,
     question:      str,
     vix_val:       float | None = None,
 ) -> str:
     """
-    Pass the Groq analysis to Grok (xAI) for risk validation and consolidation.
+    Pass the main analysis to DeepSeek for final validation.
+    DeepSeek reviews recommendations, adds confidence scores, flags risks,
+    and appends a concise final verdict section.
 
-    Grok validates confidence levels, adds missed risks/edge cases, and rewrites
-    the output as ONE unified final recommendation — no side-by-side comparison,
-    no mention of two separate AIs.
-
-    Falls back to the Groq-only analysis if Grok is unavailable.
+    Silently returns the original analysis unchanged if DeepSeek is
+    unavailable for any reason — no error messages surfaced to the user.
     """
-    if not _OPENAI_INSTALLED or not GROK_API_KEY:
-        return groq_analysis
+    key = DEEPSEEK_API_KEY or os.environ.get("DEEPSEEK_API_KEY", "")
+    if not key:
+        return main_analysis
 
     vix_str = f"{vix_val:.1f}" if vix_val is not None else "N/A"
 
-    consolidation_prompt = f"""You are a senior trading strategist and risk analyst.
-A multi-layer AI analysis system has produced the following trade recommendations.
+    validation_prompt = f"""You are a senior quant risk analyst reviewing AI-generated trade recommendations.
 
-Your role:
-1. Validate each confidence level — if additional risks warrant a downgrade, adjust the % and label inside the card header.
-2. Strengthen or rewrite the "What Could Go Wrong" section for each card to be more specific and honest.
-3. Verify the "Plain English Action" sentence is clear and actionable — rewrite if vague.
-4. Incorporate the current VIX regime (VIX={vix_str}) into confidence adjustments where relevant.
-5. Output ONE final consolidated response preserving the EXACT same card structure as the incoming analysis.
+Review the following trade cards and append a **📊 DeepSeek Validation** section at the end.
+Do NOT rewrite, reformat, or remove any existing cards. Only add the section below.
 
-CARD FORMAT RULES — YOU MUST PRESERVE:
-• Each card starts with --- then ### 🎯 or ### 🚀 header
-• Confidence and Risk on same line after the header
-• The 2-column markdown table (| | | format) with all 6 rows intact
-• "Why This Trade" as bold heading with emoji bullet points
-• "What Could Go Wrong" as bold heading with 2 sentences max
-• "Plain English Action" as bold heading with one clear sentence
-• --- divider after each card
+Your validation section must include:
+1. A one-line overall verdict on the quality of today's setup batch.
+2. For each trade symbol mentioned, a single bullet:
+   `• [SYMBOL] — [CONFIRM / REDUCE SIZE / SKIP] — [one-sentence reason]`
+3. The single biggest macro or systemic risk to all these positions right now.
+4. One sentence on what VIX={vix_str} means for sizing these trades.
 
-After all trade cards, add ONLY this brief section (do not add anything else):
-
----
-
-**📊 Risk Summary**
-- Overall probability: [one sentence on the quality of today's setup set]
-- Key risk to watch: [the single most important macro or systemic risk right now]
-- VIX context: [one sentence on what VIX={vix_str} means for these positions]
-
-CRITICAL RULES:
-• Do NOT mention that two AI systems contributed. Present as one unified expert analysis.
-• Do NOT add comparison sections, "original vs revised" diffs, or commentary on the process.
-• Do NOT change trade symbols or add new trades — only improve the existing cards.
-• Only keep HIGH and MEDIUM confidence plays.
+Keep the whole section under 200 words. Be direct and honest — do not repeat what was already said in the cards.
 
 Original question: {question}
 Current VIX: {vix_str}
 
-=== INCOMING ANALYSIS ===
-{groq_analysis}
-=== END ANALYSIS ==="""
+=== TRADE ANALYSIS TO REVIEW ===
+{main_analysis}
+=== END ==="""
 
     try:
-        client = _OpenAI(api_key=GROK_API_KEY, base_url=GROK_BASE_URL)
-        resp = client.chat.completions.create(
-            model=GROK_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an elite trading risk analyst and strategist. "
-                        "Produce clear, actionable, consolidated final recommendations. "
-                        "Never mention internal AI systems or validation pipelines."
-                    ),
-                },
-                {"role": "user", "content": consolidation_prompt},
-            ],
-            max_tokens=4500,
-            temperature=0.25,
+        resp = requests.post(
+            "https://api.deepseek.com/chat/completions",
+            headers={
+                "Authorization": f"Bearer {key}",
+                "Content-Type":  "application/json",
+            },
+            json={
+                "model":       "deepseek-chat",
+                "messages":    [{"role": "user", "content": validation_prompt}],
+                "max_tokens":  600,
+                "temperature": 0.3,
+            },
+            timeout=45,
         )
-        result = resp.choices[0].message.content
-        return result if result else groq_analysis
+        resp.raise_for_status()
+        verdict = resp.json()["choices"][0]["message"]["content"] or ""
+        if verdict.strip():
+            return main_analysis + "\n\n---\n\n" + verdict.strip()
+    except Exception:
+        pass   # DeepSeek unavailable — silently skip
 
-    except Exception as e:
-        # Grok unavailable — return Groq analysis unchanged
-        return groq_analysis + f"\n\n*⚡ Grok risk layer temporarily unavailable: {e}*"
+    return main_analysis
 
 
 # Module-level slot that captures the last Groq failure reason.
@@ -1147,33 +1115,58 @@ def _ask_groq_http(messages: list[dict], model: str, max_tokens: int = 3500) -> 
 # ═══════════════════════════════════════════════════════════════════════════════
 def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
     """
-    Silent fallback to Gemini 1.5 Flash via REST API.
-    Returns empty string if key is missing or call fails — never raises.
+    Silent fallback to Gemini via REST API.
+    Tries multiple model names in order — returns first successful response.
+    Returns empty string if key is missing or all models fail — never raises.
     """
     key = GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
     if not key:
         return ""
-    try:
-        system_text = next(
-            (m["content"] for m in messages if m["role"] == "system"), ""
-        )
-        user_text = "\n\n".join(
-            m["content"] for m in messages if m["role"] == "user"
-        )
-        url = (
-            "https://generativelanguage.googleapis.com/v1beta"
-            f"/models/gemini-1.5-flash:generateContent?key={key}"
-        )
-        payload = {
-            "systemInstruction": {"parts": [{"text": system_text}]},
-            "contents":          [{"role": "user", "parts": [{"text": user_text}]}],
-            "generationConfig":  {"maxOutputTokens": max_tokens, "temperature": 0.4},
-        }
-        resp = requests.post(url, json=payload, timeout=60)
-        resp.raise_for_status()
-        return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception:
-        return ""
+
+    system_text = next(
+        (m["content"] for m in messages if m["role"] == "system"), ""
+    )
+    user_text = "\n\n".join(
+        m["content"] for m in messages if m["role"] == "user"
+    )
+    payload = {
+        "systemInstruction": {"parts": [{"text": system_text}]},
+        "contents":          [{"role": "user", "parts": [{"text": user_text}]}],
+        "generationConfig":  {"maxOutputTokens": max_tokens, "temperature": 0.4},
+    }
+
+    # Try models in order — newest free-tier first
+    _GEMINI_MODELS = [
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash",
+    ]
+    for model in _GEMINI_MODELS:
+        try:
+            url = (
+                "https://generativelanguage.googleapis.com/v1beta"
+                f"/models/{model}:generateContent?key={key}"
+            )
+            resp = requests.post(url, json=payload, timeout=60)
+            if resp.status_code in (404, 400):
+                continue   # model not available — try next
+            if resp.status_code == 429:
+                # Rate limited — wait and retry up to twice before moving on
+                for _wait in (5, 10):
+                    time.sleep(_wait)
+                    resp = requests.post(url, json=payload, timeout=60)
+                    if resp.status_code == 200:
+                        break
+                if resp.status_code != 200:
+                    continue
+            resp.raise_for_status()
+            text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+            if text:
+                return text
+        except Exception:
+            continue
+    return ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1213,48 +1206,60 @@ def ask_adviser(
         if simple_mode else ""
     )
 
-    # Hard cap: universe context must not push the payload over Groq's limit.
-    # 20 000 chars ≈ 5 000 tokens — comfortably within free-tier limits.
-    _MAX_CTX = 20_000
+    # Hard cap: keep total payload well within Groq's free-tier token limit.
+    # SYSTEM_PROMPT ≈ 1 500 tokens; leave ~3 500 tokens for universe context.
+    # 12 000 chars ≈ 3 000 tokens — safe margin below the 6 000-token limit.
+    _MAX_CTX = 12_000
     if len(universe_ctx) > _MAX_CTX:
         universe_ctx = universe_ctx[:_MAX_CTX] + "\n[context trimmed]"
 
-    user_msg = f"""{watchlist_ctx}
+    def _build_messages(ctx: str) -> list[dict]:
+        user_msg = f"""{watchlist_ctx}
 
-{universe_ctx}
+{ctx}
 
 My question: {question}{mode_tag}"""
+        return [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user",   "content": user_msg},
+        ]
 
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user",   "content": user_msg},
-    ]
-
+    messages   = _build_messages(universe_ctx)
     groq_model = _pick_groq_model(question)
 
     # ── Try Groq via HTTP (no SDK dependency) ─────────────────────────────────
     ai_text = _ask_groq_http(messages, groq_model)
 
-    # ── Silent fallback: Gemini 1.5 Flash ────────────────────────────────────
+    # If Groq returned 413 (payload too large), halve the context and retry once
+    if not ai_text and _groq_last_err[0] == "payload_too_large":
+        universe_ctx = universe_ctx[:_MAX_CTX // 2] + "\n[context trimmed]"
+        messages     = _build_messages(universe_ctx)
+        ai_text      = _ask_groq_http(messages, groq_model)
+
+    # ── Silent fallback: Gemini ───────────────────────────────────────────────
     if not ai_text:
         ai_text = _ask_gemini(messages)
 
     if not ai_text:
+        # ── Temporary diagnostics — remove once root cause confirmed ─────────
+        _groq_key_present   = bool(GROQ_API_KEY or os.environ.get("GROQ_API_KEY", ""))
+        _gemini_key_present = bool(GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", ""))
+        _ctx_len            = len(universe_ctx)
         return (
-            "⚠️ The AI provider is temporarily unavailable. "
-            "Please try again in a moment."
+            f"⚠️ **Debug — both providers failed.**\n\n"
+            f"- Groq key present: `{_groq_key_present}`\n"
+            f"- Gemini key present: `{_gemini_key_present}`\n"
+            f"- Groq last error: `{_groq_last_err[0] or 'none'}`\n"
+            f"- Universe context length: `{_ctx_len:,}` chars\n"
+            f"- Groq model attempted: `{groq_model}`\n"
         )
 
-    # ── Grok xAI validation layer (unchanged) ────────────────────────────────
-    if HAS_GROK_LAYER and GROK_API_KEY:
-        final = _validate_and_consolidate_with_grok(ai_text, question, vix_val)
-        if stream_callback:
-            stream_callback(final)
-        return final
+    # ── DeepSeek final validation layer ──────────────────────────────────────
+    final = _validate_with_deepseek(ai_text, question, vix_val)
 
     if stream_callback:
-        stream_callback(ai_text)
-    return ai_text
+        stream_callback(final)
+    return final
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

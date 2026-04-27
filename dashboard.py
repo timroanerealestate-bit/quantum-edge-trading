@@ -56,17 +56,16 @@ _GEMINI_KEY = _get_key("GEMINI_API_KEY")
 _AV_KEY     = _get_key("ALPHA_VANTAGE_API_KEY")
 _MA_KEY     = _get_key("MARKETAUX_API_TOKEN")
 _FH_KEY     = _get_key("FINNHUB_API_KEY")
-_GROK_KEY   = _get_key("GROK_API_KEY")
+_DEEPSEEK_KEY = _get_key("DEEPSEEK_API_KEY")
 
 # ── Inject into adviser immediately (before any other logic) ───────────────
-adviser.GROQ_API_KEY    = _GROQ_KEY
-adviser.GEMINI_API_KEY  = _GEMINI_KEY
-adviser.AV_API_KEY      = _AV_KEY
-adviser.MA_API_TOKEN    = _MA_KEY
-adviser.FINNHUB_API_KEY = _FH_KEY
-adviser.GROK_API_KEY    = _GROK_KEY
-adviser.HAS_GROQ        = adviser._GROQ_INSTALLED and bool(_GROQ_KEY)
-adviser.HAS_GROK_LAYER  = adviser._OPENAI_INSTALLED and bool(_GROK_KEY)
+adviser.GROQ_API_KEY     = _GROQ_KEY
+adviser.GEMINI_API_KEY   = _GEMINI_KEY
+adviser.AV_API_KEY       = _AV_KEY
+adviser.MA_API_TOKEN     = _MA_KEY
+adviser.FINNHUB_API_KEY  = _FH_KEY
+adviser.DEEPSEEK_API_KEY = _DEEPSEEK_KEY
+adviser.HAS_GROQ         = adviser._GROQ_INSTALLED and bool(_GROQ_KEY)
 
 # ── Only stop if NEITHER AI provider has a key ────────────────────────────
 if not _GROQ_KEY and not _GEMINI_KEY:
