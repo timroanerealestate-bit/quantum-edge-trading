@@ -1086,6 +1086,38 @@ Current VIX: {vix_str}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# GROQ HTTP  (bypasses the groq package — works on any environment)
+# ═══════════════════════════════════════════════════════════════════════════════
+def _ask_groq_http(messages: list[dict], model: str, max_tokens: int = 3500) -> str:
+    """
+    Call Groq via its OpenAI-compatible REST API using requests.
+    Bypasses the groq SDK entirely — no package dependency issues.
+    Returns empty string on any failure — never raises.
+    """
+    if not GROQ_API_KEY:
+        return ""
+    try:
+        resp = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type":  "application/json",
+            },
+            json={
+                "model":       model,
+                "messages":    messages,
+                "max_tokens":  max_tokens,
+                "temperature": 0.4,
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"] or ""
+    except Exception:
+        return ""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # GEMINI FALLBACK  (silent — used only when Groq is unavailable)
 # ═══════════════════════════════════════════════════════════════════════════════
 def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
@@ -1164,59 +1196,28 @@ My question: {question}{mode_tag}"""
         {"role": "user",   "content": user_msg},
     ]
 
-    # ── Try Groq first (key-driven — HAS_GROQ not required; except catches any failure) ──
-    if GROQ_API_KEY:
-        groq_model = _pick_groq_model(question)
-        try:
-            client = _Groq(api_key=GROQ_API_KEY)
+    groq_model = _pick_groq_model(question)
 
-            if HAS_GROK_LAYER and GROK_API_KEY:
-                resp = client.chat.completions.create(
-                    model=groq_model, messages=messages,
-                    max_tokens=3500, temperature=0.4, stream=False,
-                )
-                groq_text = resp.choices[0].message.content or ""
-                final = _validate_and_consolidate_with_grok(groq_text, question, vix_val)
-                if stream_callback:
-                    stream_callback(final)
-                return final
-
-            if stream_callback:
-                full_text = ""
-                stream = client.chat.completions.create(
-                    model=groq_model, messages=messages,
-                    max_tokens=3500, temperature=0.4, stream=True,
-                )
-                for chunk in stream:
-                    text = chunk.choices[0].delta.content or ""
-                    if text:
-                        full_text += text
-                        stream_callback(text)
-                return full_text
-
-            resp = client.chat.completions.create(
-                model=groq_model, messages=messages,
-                max_tokens=3500, temperature=0.4, stream=False,
-            )
-            return resp.choices[0].message.content or "No response generated."
-
-        except Exception:
-            pass   # fall through silently to Gemini
+    # ── Try Groq via HTTP (no SDK dependency) ─────────────────────────────────
+    ai_text = _ask_groq_http(messages, groq_model)
 
     # ── Silent fallback: Gemini 1.5 Flash ────────────────────────────────────
-    gemini_text = _ask_gemini(messages)
-    if gemini_text:
-        if HAS_GROK_LAYER and GROK_API_KEY:
-            final = _validate_and_consolidate_with_grok(gemini_text, question, vix_val)
-            if stream_callback:
-                stream_callback(final)
-            return final
-        if stream_callback:
-            stream_callback(gemini_text)
-        return gemini_text
+    if not ai_text:
+        ai_text = _ask_gemini(messages)
 
-    # Ultimate fallback — rule-based (no AI keys available at all)
-    return _rule_based_response(question, scan_results, simple_mode)
+    if not ai_text:
+        return _rule_based_response(question, scan_results, simple_mode)
+
+    # ── Grok xAI validation layer (unchanged) ────────────────────────────────
+    if HAS_GROK_LAYER and GROK_API_KEY:
+        final = _validate_and_consolidate_with_grok(ai_text, question, vix_val)
+        if stream_callback:
+            stream_callback(final)
+        return final
+
+    if stream_callback:
+        stream_callback(ai_text)
+    return ai_text
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
