@@ -22,6 +22,8 @@ import chart_utils as cu
 import ai_adviser as adviser
 import market_data as md
 from options_analyzer import summarize_options
+import news_ticker as nt
+from streamlit_autorefresh import st_autorefresh
 
 # ─── API Key resolution — Streamlit secrets only ──────────────────────────────
 # Locally:  reads from .streamlit/secrets.toml
@@ -45,6 +47,9 @@ adviser.MA_API_TOKEN  = st.secrets.get("MARKETAUX_API_TOKEN", "")
 adviser.HAS_GROQ      = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
 adviser.GROK_API_KEY  = st.secrets.get("GROK_API_KEY", "")
 adviser.HAS_GROK_LAYER = adviser._OPENAI_INSTALLED and bool(adviser.GROK_API_KEY)
+
+# ─── Auto-refresh every 5 min — keeps news ticker and VIX current ─────────────
+st_autorefresh(interval=300_000, key="newsrefresh")
 
 # ─── CSS: Quantum Edge — Deep Space / Electric Cyan / Purple / Emerald ────────
 st.markdown("""
@@ -127,6 +132,10 @@ html, body, [class*="css"], .stApp {
 @keyframes float-glow {
     0%, 100% { transform: translateY(0);    filter: drop-shadow(0 0 8px  rgba(0,229,255,0.5)); }
     50%       { transform: translateY(-3px); filter: drop-shadow(0 0 18px rgba(0,229,255,0.9)); }
+}
+@keyframes ticker-scroll {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
 }
 
 /* ════════════════════════════════════════════════════
@@ -867,6 +876,120 @@ div[data-baseweb="notification"] { border-radius: 14px !important; }
 }
 
 /* ════════════════════════════════════════════════════
+   MARKET PULSE TICKER
+════════════════════════════════════════════════════ */
+.ticker-wrap {
+    position: relative;
+    background: rgba(5,6,12,0.98);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(0,229,255,0.08);
+    border-bottom: 1px solid rgba(0,229,255,0.12);
+    height: 42px;
+    overflow: hidden;
+    margin: 0 -2rem 1.8rem -2rem;
+    display: flex;
+    align-items: center;
+}
+/* Top chromatic glow line */
+.ticker-wrap::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%, rgba(0,229,255,0.5) 20%,
+        rgba(168,85,247,0.6) 50%, rgba(16,255,176,0.4) 80%,
+        transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer-text 6s linear infinite;
+    z-index: 4;
+}
+/* Fade overlay — left (hides content sliding under label) */
+.ticker-fade-left {
+    position: absolute;
+    left: 145px; top: 0; bottom: 0; width: 55px;
+    background: linear-gradient(90deg, rgba(5,6,12,0.98), transparent);
+    z-index: 3;
+    pointer-events: none;
+}
+/* Fade overlay — right (smooth exit) */
+.ticker-fade-right {
+    position: absolute;
+    right: 0; top: 0; bottom: 0; width: 55px;
+    background: linear-gradient(270deg, rgba(5,6,12,0.98), transparent);
+    z-index: 3;
+    pointer-events: none;
+}
+/* Fixed "MARKET PULSE" label on the left */
+.ticker-label {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 16px;
+    background: linear-gradient(135deg,
+        rgba(0,229,255,0.12) 0%, rgba(168,85,247,0.1) 100%);
+    border-right: 1px solid rgba(0,229,255,0.18);
+    white-space: nowrap;
+    min-width: 145px;
+}
+.ticker-label-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: #00e5ff;
+    flex-shrink: 0;
+    animation: live-pulse 1.8s ease-in-out infinite;
+    box-shadow: 0 0 6px rgba(0,229,255,0.8);
+}
+.ticker-label-text {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 0.58rem;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    color: #00e5ff;
+    text-transform: uppercase;
+    text-shadow: 0 0 10px rgba(0,229,255,0.5);
+}
+/* The scrolling track */
+.ticker-track {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    height: 100%;
+    padding-left: 155px;       /* clears the label */
+    will-change: transform;
+}
+/* Individual news item */
+.ticker-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 0 22px;
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: rgba(240,244,255,0.84);
+    letter-spacing: 0.15px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.ticker-src {
+    font-size: 0.62rem;
+    color: rgba(136,146,176,0.4);
+    font-style: italic;
+    margin-left: 5px;
+}
+/* Diamond separator between items */
+.ticker-dot {
+    display: inline-block;
+    color: rgba(0,229,255,0.22);
+    padding: 0 3px;
+    font-size: 0.5rem;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+/* ════════════════════════════════════════════════════
    SCROLLBAR
 ════════════════════════════════════════════════════ */
 ::-webkit-scrollbar { width: 4px; height: 4px; }
@@ -946,6 +1069,9 @@ div[data-baseweb="notification"] { border-radius: 14px !important; }
     [data-testid="stChatMessage"] { padding: 2px 4px !important; margin-bottom: 8px !important; }
     [data-testid="stExpander"] summary { padding: 12px 14px !important; font-size: 0.82rem !important; }
     [data-testid="stExpander"] details > div { padding: 14px !important; }
+    .ticker-wrap { margin: 0 -0.6rem 1.2rem -0.6rem !important; height: 38px !important; }
+    .ticker-item { font-size: 0.7rem !important; padding: 0 16px !important; }
+    .ticker-src { display: none !important; }
 }
 
 @media (max-width: 480px) {
@@ -998,6 +1124,64 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+
+# ─── Market Pulse Ticker ──────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False)
+def _load_ticker(_bucket: str, _ma: str, _av: str) -> list[dict]:
+    """Fetch high-impact news; re-runs only when the refresh bucket changes."""
+    nt.MA_API_TOKEN = _ma
+    nt.AV_API_KEY   = _av
+    return nt.fetch_ticker_items()
+
+
+def _render_ticker(items: list[dict]) -> None:
+    if not items:
+        return
+    # Animation duration scales with content volume (~7 s per item, min 30 s)
+    duration = max(30, len(items) * 8)
+
+    def _esc(s: str) -> str:
+        return (s.replace("&", "&amp;").replace("<", "&lt;")
+                 .replace(">", "&gt;").replace('"', "&quot;"))
+
+    parts: list[str] = []
+    for item in items * 2:          # double for seamless infinite loop
+        headline = _esc(item["headline"])
+        source   = _esc(item["source"])[:24]
+        emoji    = item["emoji"]
+        parts.append(
+            f'<span class="ticker-item">'
+            f'{emoji}&nbsp;{headline}'
+            f'<span class="ticker-src">&mdash; {source}</span>'
+            f'</span>'
+            f'<span class="ticker-dot">◆</span>'
+        )
+
+    inner = "".join(parts)
+    st.markdown(
+        f'<div class="ticker-wrap">'
+        f'  <div class="ticker-label">'
+        f'    <div class="ticker-label-dot"></div>'
+        f'    <div class="ticker-label-text">Market Pulse</div>'
+        f'  </div>'
+        f'  <div class="ticker-fade-left"></div>'
+        f'  <div class="ticker-fade-right"></div>'
+        f'  <div class="ticker-track"'
+        f'       style="animation:ticker-scroll {duration}s linear infinite;">'
+        f'    {inner}'
+        f'  </div>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+
+_ticker_items = _load_ticker(
+    nt.get_refresh_bucket(),
+    st.secrets.get("MARKETAUX_API_TOKEN", ""),
+    st.secrets.get("ALPHA_VANTAGE_API_KEY", ""),
+)
+_render_ticker(_ticker_items)
 
 
 # ─── Dynamic TTL: short when market is open, longer when closed ───────────────
