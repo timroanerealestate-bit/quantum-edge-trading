@@ -1104,7 +1104,7 @@ def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
         )
         url = (
             "https://generativelanguage.googleapis.com/v1beta"
-            f"/models/gemini-1.5-pro:generateContent?key={GEMINI_API_KEY}"
+            f"/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         )
         payload = {
             "systemInstruction": {"parts": [{"text": system_text}]},
