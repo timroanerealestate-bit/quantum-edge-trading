@@ -29,23 +29,48 @@ from streamlit_autorefresh import st_autorefresh
 # Locally:  reads from .streamlit/secrets.toml
 # On Cloud: reads from Streamlit Cloud Settings → Secrets
 
-try:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-except Exception:
-    GROQ_API_KEY = ""
+def _secret(key: str, default: str = "") -> str:
+    """Fetch a secret by name — tries both access styles, never raises."""
+    try:
+        v = st.secrets.get(key)
+        if v:
+            return str(v)
+    except Exception:
+        pass
+    try:
+        v = st.secrets[key]
+        if v:
+            return str(v)
+    except Exception:
+        pass
+    return default
 
-if not GROQ_API_KEY:
-    st.error("🔑 Groq API key is missing. Please add GROQ_API_KEY in Streamlit Cloud Settings → Secrets")
+# Load every key once, up front
+_GROQ_KEY   = _secret("GROQ_API_KEY")
+_GEMINI_KEY = _secret("GEMINI_API_KEY")
+_AV_KEY     = _secret("ALPHA_VANTAGE_API_KEY")
+_MA_KEY     = _secret("MARKETAUX_API_TOKEN")
+_FH_KEY     = _secret("FINNHUB_API_KEY")
+_GROK_KEY   = _secret("GROK_API_KEY")
+
+# Inject into adviser module immediately — before any other logic
+adviser.GROQ_API_KEY    = _GROQ_KEY
+adviser.GEMINI_API_KEY  = _GEMINI_KEY
+adviser.AV_API_KEY      = _AV_KEY
+adviser.MA_API_TOKEN    = _MA_KEY
+adviser.FINNHUB_API_KEY = _FH_KEY
+adviser.GROK_API_KEY    = _GROK_KEY
+adviser.HAS_GROQ        = adviser._GROQ_INSTALLED and bool(_GROQ_KEY)
+adviser.HAS_GROK_LAYER  = adviser._OPENAI_INSTALLED and bool(_GROK_KEY)
+
+# Only halt if neither AI provider is available
+if not _GROQ_KEY and not _GEMINI_KEY:
+    st.error(
+        "🔑 **No AI provider available.** "
+        "Add `GROQ_API_KEY` (and optionally `GEMINI_API_KEY`) in "
+        "**Streamlit Cloud → your app → ⋮ → Settings → Secrets**."
+    )
     st.stop()
-
-adviser.GROQ_API_KEY     = GROQ_API_KEY
-adviser.AV_API_KEY       = st.secrets.get("ALPHA_VANTAGE_API_KEY", "")
-adviser.MA_API_TOKEN     = st.secrets.get("MARKETAUX_API_TOKEN", "")
-adviser.FINNHUB_API_KEY  = st.secrets.get("FINNHUB_API_KEY", "")
-adviser.GEMINI_API_KEY   = st.secrets.get("GEMINI_API_KEY", "")
-adviser.HAS_GROQ         = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
-adviser.GROK_API_KEY     = st.secrets.get("GROK_API_KEY", "")
-adviser.HAS_GROK_LAYER   = adviser._OPENAI_INSTALLED and bool(adviser.GROK_API_KEY)
 
 # ─── Auto-refresh every 5 min — keeps news ticker and VIX current ─────────────
 st_autorefresh(interval=300_000, key="newsrefresh")
@@ -1177,8 +1202,8 @@ def _render_ticker(items: list[dict]) -> None:
 
 _ticker_items = _load_ticker(
     nt.get_refresh_bucket(),
-    st.secrets.get("FINNHUB_API_KEY", ""),
-    st.secrets.get("ALPHA_VANTAGE_API_KEY", ""),
+    _FH_KEY,
+    _AV_KEY,
 )
 _render_ticker(_ticker_items)
 
@@ -1705,9 +1730,9 @@ with tab_ai:
             st.session_state.chat_history = []
             st.rerun()
 
-    # API key hint
-    if not adviser.HAS_GROQ:
-        st.warning("⚠️ **Groq package not installed.** Run `pip install groq` to enable the Research Agent.")
+    # API key hint — only shown if no AI provider resolved at all
+    if not _GROQ_KEY and not _GEMINI_KEY:
+        st.warning("⚠️ **No AI provider available.** Add `GROQ_API_KEY` or `GEMINI_API_KEY` in Streamlit Cloud → Settings → Secrets.")
 
 
 # ════════════════════════════════════════════════════════════════════════════════
