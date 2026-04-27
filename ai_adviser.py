@@ -1193,13 +1193,16 @@ def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
             )
             resp = requests.post(url, json=payload, timeout=60)
             if resp.status_code in (404, 400):
+                _gemini_last_err[0] = f"{model}:{resp.status_code}"
                 continue   # model not available — try next
             if resp.status_code == 429:
+                _gemini_last_err[0] = f"{model}:429_ratelimit"
                 # Rate limited — wait and retry up to twice before moving on
                 for _wait in (5, 10):
                     time.sleep(_wait)
                     resp = requests.post(url, json=payload, timeout=60)
                     if resp.status_code == 200:
+                        _gemini_last_err[0] = ""
                         break
                 if resp.status_code != 200:
                     continue
@@ -1286,14 +1289,17 @@ My question: {question}{mode_tag}"""
     groq_model      = _pick_groq_model(question)
 
     # ── Try Groq via HTTP (compact prompt, no SDK dependency) ─────────────────
-    ai_text = _ask_groq_http(groq_messages, groq_model)
+    # max_tokens=1800: Groq free tier caps input+output per request ~4096 tokens.
+    # Compact system (~365t) + universe_ctx (~1200t) + question (~50t) ≈ 1615 input.
+    # 1615 + 1800 = 3415 — safely under the limit.
+    ai_text = _ask_groq_http(groq_messages, groq_model, max_tokens=1800)
 
-    # If Groq returned 413 still, halve context and retry once
+    # If Groq still 413, trim context further and retry with lower max_tokens
     if not ai_text and _groq_last_err[0] == "payload_too_large":
-        trimmed_ctx     = universe_ctx[:6_000] + "\n[context trimmed]"
+        trimmed_ctx     = universe_ctx[:3_000] + "\n[context trimmed]"
         groq_messages   = _build_groq_messages(trimmed_ctx)
         gemini_messages = _build_gemini_messages(trimmed_ctx)
-        ai_text         = _ask_groq_http(groq_messages, groq_model)
+        ai_text         = _ask_groq_http(groq_messages, groq_model, max_tokens=1200)
 
     # ── Silent fallback: Gemini (full prompt, higher limits) ──────────────────
     if not ai_text:
