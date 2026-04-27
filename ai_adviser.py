@@ -1139,8 +1139,8 @@ def ask_adviser(
     if scan_results is None:
         scan_results = []
 
-    # Bail only if neither Groq nor Gemini is available
-    if (not HAS_GROQ or not GROQ_API_KEY) and not GEMINI_API_KEY:
+    # Bail only if no AI key is available at all
+    if not GROQ_API_KEY and not GEMINI_API_KEY:
         return _rule_based_response(question, scan_results, simple_mode)
 
     # ── Full multi-layer validation (every query) ─────────────────────────────
@@ -1164,8 +1164,8 @@ My question: {question}{mode_tag}"""
         {"role": "user",   "content": user_msg},
     ]
 
-    # ── Try Groq first (with smart model routing) ─────────────────────────────
-    if HAS_GROQ and GROQ_API_KEY:
+    # ── Try Groq first (key-driven — HAS_GROQ not required; except catches any failure) ──
+    if GROQ_API_KEY:
         groq_model = _pick_groq_model(question)
         try:
             client = _Groq(api_key=GROQ_API_KEY)
@@ -1226,14 +1226,16 @@ def _rule_based_response(question: str, scan_results: list[dict], simple_mode: b
     q = question.lower()
 
     no_groq_note = (
-        "\n\n> *Add `GROQ_API_KEY` to `.env` to unlock the full Research Agent with "
-        "5-layer validation, live options flow, and AI-generated trade cards.*"
+        "\n\n> *Add `GROQ_API_KEY` in Streamlit Cloud → Settings → Secrets "
+        "to unlock the full Research Agent with 5-layer validation, live options flow, "
+        "and AI-generated trade cards.*"
     )
 
     if not scan_results:
         return (
-            "## 🔬 Research Agent — Groq key required\n\n"
-            "The multi-layer validation pipeline needs the Groq AI key to run.\n"
+            "## 🔬 Research Agent — AI key required\n\n"
+            "No AI provider is currently available. Please check that your API keys "
+            "are set in Streamlit Cloud → Settings → Secrets.\n"
             + no_groq_note
         )
 
