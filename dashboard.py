@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="Quantum Edge Trading",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ─── Local imports ─────────────────────────────────────────────────────────────
@@ -39,10 +39,12 @@ if "GROQ_API_KEY" not in st.secrets:
     )
     st.stop()
 
-adviser.GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-adviser.AV_API_KEY   = st.secrets.get("ALPHA_VANTAGE_API_KEY", "")
-adviser.MA_API_TOKEN = st.secrets.get("MARKETAUX_API_TOKEN", "")
-adviser.HAS_GROQ     = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
+adviser.GROQ_API_KEY  = st.secrets["GROQ_API_KEY"]
+adviser.AV_API_KEY    = st.secrets.get("ALPHA_VANTAGE_API_KEY", "")
+adviser.MA_API_TOKEN  = st.secrets.get("MARKETAUX_API_TOKEN", "")
+adviser.HAS_GROQ      = adviser._GROQ_INSTALLED and bool(adviser.GROQ_API_KEY)
+adviser.GROK_API_KEY  = st.secrets.get("GROK_API_KEY", "")
+adviser.HAS_GROK_LAYER = adviser._OPENAI_INSTALLED and bool(adviser.GROK_API_KEY)
 
 # ─── CSS: Quantum Edge — Charcoal / Emerald / Purple premium theme ───────────
 st.markdown("""
@@ -728,21 +730,149 @@ div[data-baseweb="notification"] { border-radius: 12px !important; }
 ::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(0,210,106,0.3); }
+
+/* ════════════════════════════════════════════════════
+   MOBILE — Phone-friendly responsive overrides
+   Breakpoints: ≤768px tablet/phone, ≤480px phone-only
+═══════════════════════════════════════════════════ */
+
+/* Prevent horizontal overflow on all screen sizes */
+.stApp, .main, .block-container { overflow-x: hidden !important; }
+
+@media (max-width: 768px) {
+    /* Tighter content padding */
+    .main .block-container {
+        padding-left: 0.6rem !important;
+        padding-right: 0.6rem !important;
+        max-width: 100% !important;
+    }
+
+    /* Header: wrap, hide nav pills */
+    .qe-header {
+        flex-wrap: wrap !important;
+        height: auto !important;
+        min-height: 52px !important;
+        padding: 10px 14px !important;
+        gap: 8px !important;
+        margin: -1rem -0.6rem 1.2rem -0.6rem !important;
+    }
+    .qe-nav { display: none !important; }
+    .qe-meta { gap: 8px !important; }
+    .qe-title { font-size: 0.82rem !important; letter-spacing: 1.5px !important; }
+    .qe-subtitle { font-size: 0.52rem !important; letter-spacing: 1.2px !important; }
+    .qe-logo-mark { width: 30px !important; height: 30px !important; font-size: 0.75rem !important; }
+
+    /* VIX box: stack vertically */
+    .vix-container {
+        flex-direction: column !important;
+        gap: 12px !important;
+        padding: 14px 16px !important;
+    }
+    .vix-guide-panel {
+        border-left: none !important;
+        border-top: 1px solid rgba(255,255,255,0.06) !important;
+        padding-left: 0 !important;
+        padding-top: 12px !important;
+        flex: unset !important;
+    }
+
+    /* Tabs: horizontally scrollable, touch-friendly */
+    .stTabs [data-baseweb="tab-list"] {
+        overflow-x: auto !important;
+        flex-wrap: nowrap !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none !important;
+    }
+    .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none !important; }
+    .stTabs [data-baseweb="tab"] {
+        padding: 9px 14px !important;
+        font-size: 0.76rem !important;
+        white-space: nowrap !important;
+        min-height: 40px !important;
+    }
+
+    /* Touch-friendly buttons — minimum 44px tap target */
+    .stButton > button {
+        min-height: 44px !important;
+        font-size: 0.8rem !important;
+        width: 100% !important;
+        touch-action: manipulation !important;
+    }
+
+    /* Sidebar buttons full width */
+    [data-testid="stSidebar"] .stButton > button {
+        min-height: 42px !important;
+    }
+
+    /* Chat input — larger tap target */
+    [data-testid="stChatInput"] textarea {
+        min-height: 52px !important;
+        font-size: 0.9rem !important;
+        padding: 14px 16px !important;
+    }
+
+    /* Metric cards — tighter on mobile */
+    [data-testid="stMetric"] {
+        padding: 14px 16px !important;
+    }
+    [data-testid="stMetricValue"] > div {
+        font-size: 1.35rem !important;
+        letter-spacing: -0.3px !important;
+    }
+
+    /* Data tables — allow horizontal scroll within */
+    [data-testid="stDataFrame"] {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+    }
+
+    /* Command center header */
+    .command-center-header {
+        padding: 16px 16px 14px !important;
+    }
+    .cc-title {
+        font-size: 0.85rem !important;
+        letter-spacing: 3px !important;
+    }
+    .cc-subtitle { font-size: 0.6rem !important; letter-spacing: 1.5px !important; }
+
+    /* Chat bubbles */
+    .ai-bubble, .user-bubble {
+        padding: 12px 14px !important;
+        font-size: 0.85rem !important;
+        line-height: 1.65 !important;
+    }
+
+    /* Expanders */
+    .streamlit-expanderHeader, [data-testid="stExpander"] summary {
+        padding: 12px 14px !important;
+        font-size: 0.82rem !important;
+    }
+    [data-testid="stExpander"] details > div {
+        padding: 14px !important;
+    }
+
+    /* Simple tip box */
+    .simple-tip { padding: 12px 14px !important; font-size: 0.83rem !important; }
+
+    /* Text inputs */
+    .stTextInput input, .stTextArea textarea {
+        font-size: 0.9rem !important;
+        padding: 12px 14px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    /* Extra-small phones: single column feel for preset buttons */
+    .stTabs [data-baseweb="tab"] {
+        padding: 8px 10px !important;
+        font-size: 0.7rem !important;
+    }
+    [data-testid="stMetricValue"] > div { font-size: 1.2rem !important; }
+    .qe-timestamp { display: none !important; }
+}
 </style>
 """, unsafe_allow_html=True)
-
-# ─── Load persisted custom CSS (from UI Improvements tab) ─────────────────────
-import os as _os
-_custom_css_path = _os.path.join(_os.path.dirname(__file__), "custom_ui.css")
-if _os.path.exists(_custom_css_path):
-    try:
-        with open(_custom_css_path, "r", encoding="utf-8") as _f:
-            _custom_css = _f.read().strip()
-        if _custom_css:
-            st.markdown(f"<style>{_custom_css}</style>", unsafe_allow_html=True)
-    except Exception:
-        pass
-
 
 # ─── Session state defaults ────────────────────────────────────────────────────
 _STATE_DEFAULTS = {
@@ -753,12 +883,6 @@ _STATE_DEFAULTS = {
     "options_cache":   {},
     "simple_mode":     False,
     "pending_q":       "",
-    # UI improvements tab
-    "ui_analysis":      "",
-    "ui_approved":      set(),
-    "ui_rejected":      set(),
-    "ui_css_artifacts": "",
-    "ui_applied":       False,
 }
 for _k, _v in _STATE_DEFAULTS.items():
     if _k not in st.session_state:
@@ -835,7 +959,7 @@ else:
 _refresh_ttl_str = ("45s" if _mkt_status["open"] else "5m")
 
 st.markdown(f"""
-<div style="
+<div class="vix-container" style="
     background: linear-gradient(135deg, #1a1b22 0%, #0f1014 100%);
     border: 1px solid {_vix_color}44;
     border-left: 4px solid {_vix_color};
@@ -880,7 +1004,7 @@ st.markdown(f"""
             Updated {_vix_as_of} &nbsp;•&nbsp; refreshes every {_refresh_ttl_str}
         </div>
     </div>
-    <div style="flex:1;border-left:1px solid rgba(255,255,255,0.06);
+    <div class="vix-guide-panel" style="flex:1;border-left:1px solid rgba(255,255,255,0.06);
                 padding-left:28px;font-size:12px;color:#8892a4;line-height:1.8;">
         <b style="color:#f0f0f5;">VIX Guide</b><br>
         <span style="color:#00d26a;">▪ &lt;15</span> Low Volatility — markets calm, options cheap<br>
@@ -1132,13 +1256,12 @@ st.divider()
 # ═══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ═══════════════════════════════════════════════════════════════════════════════
-tab_ai, tab_results, tab_whale, tab_news, tab_charts, tab_ui = st.tabs([
+tab_ai, tab_results, tab_whale, tab_news, tab_charts = st.tabs([
     "🔬  Research Agent",
     "📊  Results",
     "🐋  Whale Activity",
     "📰  Market News",
     "📈  Charts",
-    "🖌  UI Improvements",
 ])
 
 
@@ -1150,8 +1273,8 @@ with tab_ai:
 <div class="command-center-header">
     <div class="cc-title">🔬 AI Research Agent</div>
     <div class="cc-subtitle">
-        Powered by Groq &nbsp;•&nbsp; llama-3.3-70b &nbsp;•&nbsp;
-        Scans 90-stock universe for options plays &nbsp;•&nbsp; Small / Mid / Large Cap
+        Groq llama-3.3-70b &nbsp;•&nbsp; Grok xAI validation &nbsp;•&nbsp;
+        5-layer universe scan &nbsp;•&nbsp; Small / Mid / Large Cap
     </div>
 </div>
 """, unsafe_allow_html=True)
@@ -1294,7 +1417,7 @@ with tab_ai:
         def _progress(msg: str):
             _status_placeholder.info(msg)
 
-        with st.spinner("🔬 Research Agent — running 5-layer validation…"):
+        with st.spinner("🔬 Research Agent — running multi-layer validation + Grok verification…"):
             response = adviser.ask_adviser(
                 question     = active_q,
                 scan_results = results,
@@ -1765,382 +1888,4 @@ with tab_charts:
                             st.info(c)
 
 
-# ════════════════════════════════════════════════════════════════════════════════
-# TAB 6 — UI IMPROVEMENTS
-# ════════════════════════════════════════════════════════════════════════════════
-with tab_ui:
-    st.markdown("""
-<div class="command-center-header">
-    <div class="cc-title">🖌 UI Improvements Agent</div>
-    <div class="cc-subtitle">
-        AI analyses the dashboard &nbsp;•&nbsp; Compares to TradingView, Bloomberg &amp;
-        thinkorswim &nbsp;•&nbsp; Proposes specific changes &nbsp;•&nbsp; You approve before anything changes
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-    st.markdown("""
-**How it works:**
-1. Click **Analyse Dashboard** — the AI reviews every aspect of the current design
-2. Review the numbered improvement proposals
-3. Approve the ones you want — rejected proposals are discarded
-4. Approved changes are noted for implementation in the next update
-""")
-
-    col_btn1, col_btn2, _ = st.columns([1, 1, 3])
-    with col_btn1:
-        analyse_btn = st.button(
-            "🔍 Analyse Dashboard", type="primary", width="stretch",
-            key="ui_analyse_btn",
-        )
-    with col_btn2:
-        if st.session_state.ui_analysis:
-            if st.button("🗑 Clear Analysis", type="secondary", width="stretch", key="ui_clear_btn"):
-                st.session_state.ui_analysis = ""
-                st.session_state.ui_approved = set()
-                st.session_state.ui_rejected = set()
-                st.rerun()
-
-    if analyse_btn:
-        st.session_state.ui_approved = set()
-        st.session_state.ui_rejected = set()
-        _ui_placeholder = st.empty()
-        _ui_chunks      = []
-
-        def _ui_stream(chunk: str):
-            _ui_chunks.append(chunk)
-            _ui_placeholder.markdown("".join(_ui_chunks))
-
-        with st.spinner("🧠 AI is analysing the dashboard against top platforms…"):
-            if adviser.HAS_GROQ:
-                full = adviser.ask_ui_adviser(stream_callback=_ui_stream)
-            else:
-                full = adviser.ask_ui_adviser()
-
-        _ui_placeholder.empty()
-        st.session_state.ui_analysis = full
-        st.rerun()
-
-    # ── Show analysis + approval UI ───────────────────────────────────────────
-    if st.session_state.ui_analysis:
-        st.divider()
-        st.markdown("### 📋 Analysis Results")
-        st.markdown(
-            "<div style='background:#1a1b22;border:1px solid rgba(139,86,246,0.25);"
-            "border-left:4px solid #8b56f6;border-radius:10px;padding:20px 24px;"
-            "margin-bottom:16px;'>"
-            + st.session_state.ui_analysis.replace("\n", "<br>")
-            + "</div>",
-            unsafe_allow_html=True,
-        )
-
-        st.divider()
-        st.markdown("### ✅ Your Approval")
-        st.caption("Mark which improvements you'd like to see implemented:")
-
-        # Parse numbered proposals from the analysis text
-        import re as _re
-        _proposals = _re.findall(
-            r"(\d+)\.\s+\*{0,2}([^\n\*]+)\*{0,2}",
-            st.session_state.ui_analysis,
-        )
-
-        if _proposals:
-            for num_str, title in _proposals[:12]:
-                num   = int(num_str)
-                is_ap = num in st.session_state.ui_approved
-                is_rj = num in st.session_state.ui_rejected
-
-                badge = "✅ Approved" if is_ap else ("❌ Rejected" if is_rj else "⏳ Pending")
-                badge_color = "#00d26a" if is_ap else ("#ff4040" if is_rj else "#8892a4")
-
-                with st.container():
-                    ac1, ac2, ac3 = st.columns([6, 1, 1])
-                    with ac1:
-                        st.markdown(
-                            f"<span style='color:{badge_color};font-weight:600;'>{badge}</span> &nbsp; "
-                            f"**{num}. {title.strip()}**",
-                            unsafe_allow_html=True,
-                        )
-                    with ac2:
-                        if not is_ap:
-                            if st.button("✅", key=f"ui_ap_{num}", help="Approve this change"):
-                                st.session_state.ui_approved.add(num)
-                                st.session_state.ui_rejected.discard(num)
-                                st.rerun()
-                    with ac3:
-                        if not is_rj:
-                            if st.button("❌", key=f"ui_rj_{num}", help="Reject this change"):
-                                st.session_state.ui_rejected.add(num)
-                                st.session_state.ui_approved.discard(num)
-                                st.rerun()
-
-            # Summary
-            st.divider()
-            approved = sorted(st.session_state.ui_approved)
-            rejected = sorted(st.session_state.ui_rejected)
-            pending  = [n for n, _ in _proposals if int(n) not in st.session_state.ui_approved
-                        and int(n) not in st.session_state.ui_rejected]
-
-            c1, c2, c3 = st.columns(3)
-            c1.metric("✅ Approved", len(approved))
-            c2.metric("❌ Rejected", len(rejected))
-            c3.metric("⏳ Pending",  len(pending))
-
-            if approved:
-                st.success(
-                    f"✅ **Proposals #{', #'.join(map(str, approved))} approved.** "
-                    "Click **Generate CSS** below to create live styles for your approved changes."
-                )
-
-            # ── CSS generation ──────────────────────────────────────────────────
-            if approved:
-                st.divider()
-                st.markdown("### 🎨 Apply Approved Changes")
-
-                gen_col, _, _ = st.columns([2, 1, 3])
-                with gen_col:
-                    gen_css_btn = st.button(
-                        "🎨 Generate CSS for Approved Changes",
-                        type="primary",
-                        width="stretch",
-                        key="ui_gen_css_btn",
-                        disabled=not adviser.HAS_GROQ,
-                    )
-
-                if not adviser.HAS_GROQ:
-                    st.caption(
-                        "💡 Add `GROQ_API_KEY` to `.env` to enable CSS generation."
-                    )
-
-                if gen_css_btn and adviser.HAS_GROQ:
-                    _approved_titles = [
-                        title.strip()
-                        for num_str, title in _proposals
-                        if int(num_str) in st.session_state.ui_approved
-                    ]
-                    _css_placeholder = st.empty()
-                    _css_chunks: list[str] = []
-
-                    def _css_stream(chunk: str):
-                        _css_chunks.append(chunk)
-                        _css_placeholder.code("".join(_css_chunks), language="css")
-
-                    with st.spinner("🎨 AI generating CSS for approved proposals…"):
-                        css_raw = adviser.generate_ui_css(
-                            _approved_titles,
-                            st.session_state.ui_analysis,
-                            stream_callback=_css_stream,
-                        )
-
-                    _css_placeholder.empty()
-                    extracted = adviser.extract_css_from_response(css_raw)
-                    st.session_state.ui_css_artifacts = extracted if extracted else css_raw
-                    st.rerun()
-
-                # ── Show CSS artifact card ───────────────────────────────────────
-                if st.session_state.ui_css_artifacts:
-                    st.markdown(
-                        "<div style='background:linear-gradient(135deg,#1a1b22,#0f1014);"
-                        "border:1px solid rgba(0,210,106,0.3);"
-                        "border-left:4px solid #00d26a;"
-                        "border-radius:12px;padding:16px 20px;margin:8px 0 12px;'>"
-                        "<div style='font-size:10px;font-weight:700;letter-spacing:2.5px;"
-                        "color:#00d26a;text-transform:uppercase;margin-bottom:6px;'>"
-                        "✦ CSS Artifact — Ready to Apply</div>"
-                        "<div style='font-size:12px;color:#8892a4;'>"
-                        "Review the generated CSS below. Click <b style='color:#f0f0f5;'>"
-                        "Apply Changes</b> to write it to <code>custom_ui.css</code> and "
-                        "activate it immediately.</div>"
-                        "</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    st.code(st.session_state.ui_css_artifacts, language="css")
-
-                    apply_col, reset_col, _ = st.columns([1, 1, 3])
-                    with apply_col:
-                        if st.button(
-                            "✅ Apply Changes to Dashboard",
-                            type="primary",
-                            width="stretch",
-                            key="ui_apply_btn",
-                        ):
-                            _css_path = _os.path.join(
-                                _os.path.dirname(__file__), "custom_ui.css"
-                            )
-                            try:
-                                with open(_css_path, "w", encoding="utf-8") as _fh:
-                                    _fh.write(st.session_state.ui_css_artifacts)
-                                # Inject immediately for this session
-                                st.markdown(
-                                    f"<style>{st.session_state.ui_css_artifacts}</style>",
-                                    unsafe_allow_html=True,
-                                )
-                                st.session_state.ui_applied = True
-                                st.success(
-                                    "✅ **Changes applied!** CSS is now live and saved to "
-                                    "`custom_ui.css` — it will auto-load on every future session."
-                                )
-                            except Exception as _e:
-                                st.error(f"Failed to save CSS: {_e}")
-
-                    with reset_col:
-                        if st.session_state.ui_applied:
-                            if st.button(
-                                "🗑 Remove Applied CSS",
-                                type="secondary",
-                                width="stretch",
-                                key="ui_reset_css_btn",
-                            ):
-                                _css_path = _os.path.join(
-                                    _os.path.dirname(__file__), "custom_ui.css"
-                                )
-                                if _os.path.exists(_css_path):
-                                    _os.remove(_css_path)
-                                st.session_state.ui_applied       = False
-                                st.session_state.ui_css_artifacts = ""
-                                st.rerun()
-
-        else:
-            st.info("No numbered proposals detected — review the analysis above and re-run if needed.")
-
-    elif not analyse_btn:
-        st.info(
-            "👆 Click **Analyse Dashboard** to start. The AI will compare your dashboard "
-            "against TradingView, Bloomberg Terminal, and thinkorswim — then propose "
-            "specific improvements for your approval."
-        )
-
-    # ── Live CSS Editor (always visible at bottom of UI tab) ─────────────────
-    st.divider()
-    st.markdown("""
-<div style='display:flex;align-items:center;gap:12px;margin-bottom:4px;'>
-    <div style='font-size:13px;font-weight:700;letter-spacing:1.5px;
-                color:#8892a4;text-transform:uppercase;'>
-        🖊 Live CSS Editor
-    </div>
-    <div style='font-size:11px;color:rgba(255,255,255,0.2);'>
-        Edit &amp; preview styles instantly — no restart needed
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-    # Load current custom_ui.css into the editor as the default value
-    _editor_css_path = _os.path.join(_os.path.dirname(__file__), "custom_ui.css")
-    _editor_default  = ""
-    if _os.path.exists(_editor_css_path):
-        try:
-            with open(_editor_css_path, "r", encoding="utf-8") as _ef:
-                _editor_default = _ef.read().strip()
-        except Exception:
-            pass
-
-    _live_css = st.text_area(
-        "CSS Editor",
-        value=_editor_default,
-        height=300,
-        placeholder="/* Paste or type CSS here — click Preview to see it live */\n\n"
-                    ".stApp { background-color: #0a0b0f !important; }\n"
-                    "[data-testid=\"stSidebar\"] { background: #111216 !important; }",
-        key="live_css_editor",
-        label_visibility="collapsed",
-    )
-
-    _ec1, _ec2, _ec3, _ec4 = st.columns([1, 1, 1, 3])
-
-    with _ec1:
-        _preview_btn = st.button(
-            "👁 Preview", type="primary", width="stretch", key="css_preview_btn"
-        )
-    with _ec2:
-        _save_btn = st.button(
-            "💾 Save & Lock", type="primary", width="stretch", key="css_save_btn"
-        )
-    with _ec3:
-        _clear_btn = st.button(
-            "🗑 Clear CSS", type="secondary", width="stretch", key="css_clear_btn"
-        )
-
-    # ── Preview: inject CSS into page RIGHT NOW (no save, no rerun) ──────────
-    if _preview_btn and _live_css.strip():
-        st.markdown(
-            f"<style>{_live_css}</style>",
-            unsafe_allow_html=True,
-        )
-        st.success("👁 Preview active — CSS injected. Scroll the page to see changes.")
-
-    # ── Save: write to custom_ui.css + inject immediately ────────────────────
-    if _save_btn:
-        try:
-            with open(_editor_css_path, "w", encoding="utf-8") as _sf:
-                _sf.write(_live_css)
-            # Inject immediately so changes are visible right now
-            if _live_css.strip():
-                st.markdown(f"<style>{_live_css}</style>", unsafe_allow_html=True)
-            st.session_state.ui_css_artifacts = _live_css
-            st.session_state.ui_applied       = True
-            st.success(
-                "💾 **Saved & locked!** CSS written to `custom_ui.css` and live now. "
-                "Changes load automatically on every future launch."
-            )
-        except Exception as _se:
-            st.error(f"Save failed: {_se}")
-
-    # ── Clear: delete custom_ui.css ───────────────────────────────────────────
-    if _clear_btn:
-        if _os.path.exists(_editor_css_path):
-            _os.remove(_editor_css_path)
-        st.session_state.ui_applied       = False
-        st.session_state.ui_css_artifacts = ""
-        st.rerun()
-
-    # ── Quick-reference palette + selectors ──────────────────────────────────
-    with st.expander("📖 Selector & Palette Reference", expanded=False):
-        st.markdown("""
-**Common Streamlit selectors:**
-```css
-.stApp                                   /* whole page background */
-.main .block-container                   /* main content area */
-[data-testid="stSidebar"]               /* sidebar */
-.stTabs [data-baseweb="tab-list"]       /* tab bar */
-.stTabs [aria-selected="true"]          /* active tab */
-.stButton > button[kind="primary"]      /* primary buttons */
-.stButton > button[kind="secondary"]    /* secondary buttons */
-[data-testid="stMetric"]               /* metric cards */
-[data-testid="stDataFrame"]            /* data tables */
-.stTextInput input                      /* text inputs */
-[data-testid="stChatInput"]            /* chat input bar */
-```
-
-**Existing colour palette:**
-| Name | Hex | Usage |
-|------|-----|-------|
-| BG Main | `#0f1014` | Page background |
-| BG Card | `#1a1b22` | Cards / panels |
-| Emerald | `#00d26a` | Gains, active, primary |
-| Purple | `#8b56f6` | AI / secondary |
-| Red | `#ff4040` | Losses / danger |
-| Gold | `#ffc107` | Warnings / watch |
-| Text | `#f0f0f5` | Primary text |
-| Muted | `#8892a4` | Secondary text |
-
-**Example tweaks to try:**
-```css
-/* Wider main content */
-.main .block-container { max-width: 1800px !important; }
-
-/* Brighter tab highlight */
-.stTabs [aria-selected="true"] { color: #00ffaa !important; }
-
-/* Larger metric values */
-[data-testid="stMetricValue"] > div { font-size: 2.2rem !important; }
-
-/* Purple primary buttons instead of green */
-.stButton > button[kind="primary"] {
-    background: linear-gradient(180deg, #9b68ff, #7a40e6) !important;
-    box-shadow: 0 5px 0 #4a2090, 0 8px 20px rgba(139,86,246,0.4) !important;
-}
-```
-""")
 

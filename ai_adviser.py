@@ -39,6 +39,22 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 
 HAS_GROQ = _GROQ_INSTALLED  # True when package is installed; key injected at runtime
 
+# ── Grok (xAI) — secondary validation + consolidation layer ──────────────────
+# Key injected by dashboard.py from st.secrets["GROK_API_KEY"].
+# Uses the OpenAI-compatible client pointing to api.x.ai.
+GROK_API_KEY  = ""
+GROK_MODEL    = "grok-beta"
+GROK_BASE_URL = "https://api.x.ai/v1"
+
+try:
+    from openai import OpenAI as _OpenAI
+    _OPENAI_INSTALLED = True
+except ImportError:
+    _OpenAI = None
+    _OPENAI_INSTALLED = False
+
+HAS_GROK_LAYER = _OPENAI_INSTALLED  # True when openai pkg installed; key injected at runtime
+
 
 # ── Stock universe ────────────────────────────────────────────────────────────
 SMALL_CAP = [
@@ -206,76 +222,6 @@ SIMPLE MODE: Plain English, explain every term, analogies welcome.
 ADVANCED MODE (default): Full numbers, IV analysis, pattern details.
 
 ⚠️ Options carry risk of total loss. This is data-driven analysis, not financial advice."""
-
-
-UI_SYSTEM_PROMPT = """You are a senior UI/UX expert and trading platform designer.
-Critically analyse the dashboard below and propose concrete improvements,
-comparing it to TradingView, Bloomberg Terminal, thinkorswim, and Webull.
-
-Rules:
-1. Identify real weaknesses honestly — minimum 6 proposals, maximum 10.
-2. Compare each to how top platforms solve it.
-3. Number each proposal. Each must use EXACTLY this format:
-
-### [N]. [TITLE]
-**Impact:** HIGH / MEDIUM / LOW
-**Current State:** [what it looks like now]
-**Proposed Change:** [specific change — mention colours, sizes, layout]
-**Why:** [one sentence reasoning referencing a named platform]
-
-4. After all proposals, include a section called:
-### CSS ARTIFACT
-Provide a complete, copy-paste-ready CSS block that implements ALL proposals at once.
-The CSS block must be fenced in triple backticks with the css language tag.
-Use real Streamlit CSS selectors (.stApp, .stButton > button, [data-testid="stSidebar"], etc.)
-Keep the dark theme. Use the existing palette: #0f1014 bg, #1a1b22 card, #00d26a emerald, #8b56f6 purple.
-
-5. End with a 2–3 sentence ### Overall Verdict.
-
-Be direct, specific, and actionable."""
-
-
-UI_CSS_PROMPT = """You are a CSS expert for Streamlit trading dashboards.
-Generate production-ready CSS for the approved UI improvements listed.
-
-Rules:
-1. Use real Streamlit CSS class selectors:
-   .stApp, .main .block-container, [data-testid="stSidebar"],
-   .stButton > button, .stTabs [data-baseweb="tab"],
-   .stTextInput > div > div > input, .stMetric, etc.
-2. Use the existing colour palette — do not break the dark theme:
-   Background: #0f1014   Card: #1a1b22   Emerald: #00d26a
-   Purple: #8b56f6        Red: #ff4040    Text: #f0f0f5
-3. Each change must have a comment: /* === Proposal N: Title === */
-4. Changes must be purely additive — enhance, don't break existing styles.
-5. Return ONLY valid CSS inside a single ```css ... ``` fenced block.
-   No explanations, no markdown prose outside the fence."""
-
-CURRENT_DASHBOARD_DESC = """
-Dashboard: Quantum Edge Trading
-Stack: Streamlit + Plotly + custom CSS
-
-Layout:
-  • Full-width dark app, charcoal background (#0f1014)
-  • Fixed header bar: logo, nav pills, live timestamp
-  • Sidebar: watchlist textarea, Run Scan button, Quick Analyze, top-7 results list
-  • Main: VIX box → market heat map → summary metrics → 6 tabs
-  • Tabs: AI Research Agent | Results | Whale Activity | Market News | Charts | UI Improvements
-
-Colors: emerald #00d26a, purple #8b56f6, red #ff4040, gold #ffc107
-Fonts: Inter (UI), JetBrains Mono (timestamps)
-Charts: candlestick, RSI, MACD, score bar, radar, gauge, treemap heatmap
-Buttons: 3D elevated box-shadow
-
-Known weaknesses to evaluate:
-  • Sidebar always visible (22% screen width consumed)
-  • No auto-refresh — manual scan trigger only
-  • No keyboard shortcuts
-  • No watchlist save/load
-  • Charts have no drawing tools
-  • No order ticket integration
-  • Dark mode only
-"""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -890,6 +836,82 @@ def _build_context(scan_results: list[dict], options_data: dict | None = None) -
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# GROK VALIDATION + CONSOLIDATION
+# ═══════════════════════════════════════════════════════════════════════════════
+def _validate_and_consolidate_with_grok(
+    groq_analysis: str,
+    question:      str,
+    vix_val:       float | None = None,
+) -> str:
+    """
+    Pass the Groq analysis to Grok (xAI) for risk validation and consolidation.
+
+    Grok validates confidence levels, adds missed risks/edge cases, and rewrites
+    the output as ONE unified final recommendation — no side-by-side comparison,
+    no mention of two separate AIs.
+
+    Falls back to the Groq-only analysis if Grok is unavailable.
+    """
+    if not _OPENAI_INSTALLED or not GROK_API_KEY:
+        return groq_analysis
+
+    vix_str = f"{vix_val:.1f}" if vix_val is not None else "N/A"
+
+    consolidation_prompt = f"""You are a senior trading strategist and risk analyst.
+A multi-layer AI analysis system has produced the following trade recommendations.
+
+Your role:
+1. Validate each confidence level — if risks warrant a downgrade, adjust it and explain briefly inside the card.
+2. Add any missed risks or edge cases directly under "What Could Go Wrong" in each trade card.
+3. Incorporate the current VIX regime ({vix_str}) into the probability assessment.
+4. Produce ONE final consolidated output in the exact same structured card format as the incoming analysis.
+5. After all trade cards, add this concise section:
+
+**📊 Consolidated Risk Summary**
+- Probability assessment for this overall set of recommendations
+- 2–3 key macro or systemic risks to monitor
+- One sentence: overall confidence in today's setups given VIX={vix_str}
+
+CRITICAL RULES:
+• Do NOT mention that two AI systems contributed. Present as one unified expert analysis.
+• Do NOT add a "Grok says vs analysis says" comparison section.
+• Keep the same trade card format and total length as the original.
+• Only recommend HIGH and MEDIUM confidence plays.
+
+Original question: {question}
+Current VIX: {vix_str}
+
+=== INCOMING ANALYSIS ===
+{groq_analysis}
+=== END ANALYSIS ==="""
+
+    try:
+        client = _OpenAI(api_key=GROK_API_KEY, base_url=GROK_BASE_URL)
+        resp = client.chat.completions.create(
+            model=GROK_MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an elite trading risk analyst and strategist. "
+                        "Produce clear, actionable, consolidated final recommendations. "
+                        "Never mention internal AI systems or validation pipelines."
+                    ),
+                },
+                {"role": "user", "content": consolidation_prompt},
+            ],
+            max_tokens=4500,
+            temperature=0.25,
+        )
+        result = resp.choices[0].message.content
+        return result if result else groq_analysis
+
+    except Exception as e:
+        # Grok unavailable — return Groq analysis unchanged
+        return groq_analysis + f"\n\n*⚡ Grok risk layer temporarily unavailable: {e}*"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # PUBLIC API
 # ═══════════════════════════════════════════════════════════════════════════════
 def ask_adviser(
@@ -937,6 +959,20 @@ My question: {question}{mode_tag}"""
     try:
         client = _Groq(api_key=GROQ_API_KEY)
 
+        # ── Grok validation layer active: get Groq analysis then consolidate ──
+        if HAS_GROK_LAYER and GROK_API_KEY:
+            resp = client.chat.completions.create(
+                model=GROQ_MODEL, messages=messages,
+                max_tokens=3500, temperature=0.4, stream=False,
+            )
+            groq_text = resp.choices[0].message.content or ""
+            # Grok validates risk, adjusts confidence, returns one final answer
+            final = _validate_and_consolidate_with_grok(groq_text, question, vix_val)
+            if stream_callback:
+                stream_callback(final)
+            return final
+
+        # ── No Grok key: original Groq-only paths ────────────────────────────
         if stream_callback:
             full_text = ""
             stream = client.chat.completions.create(
@@ -959,97 +995,6 @@ My question: {question}{mode_tag}"""
     except Exception as e:
         fallback = _rule_based_response(question, scan_results, simple_mode)
         return f"⚠️ AI error: {e}\n\n---\n\n{fallback}"
-
-
-def ask_ui_adviser(stream_callback=None) -> str:
-    """UI/UX improvement analysis agent — returns proposals + embedded CSS artifact."""
-    if not HAS_GROQ or not GROQ_API_KEY:
-        return _ui_rule_based()
-
-    messages = [
-        {"role": "system", "content": UI_SYSTEM_PROMPT},
-        {"role": "user",   "content":
-            f"Analyse this trading dashboard and return your improvement proposals "
-            f"followed by a CSS ARTIFACT block:\n\n{CURRENT_DASHBOARD_DESC}"},
-    ]
-
-    try:
-        client = _Groq(api_key=GROQ_API_KEY)
-
-        if stream_callback:
-            full_text = ""
-            stream = client.chat.completions.create(
-                model=GROQ_MODEL, messages=messages,
-                max_tokens=4000, temperature=0.35, stream=True,
-            )
-            for chunk in stream:
-                text = chunk.choices[0].delta.content or ""
-                if text:
-                    full_text += text
-                    stream_callback(text)
-            return full_text
-
-        resp = client.chat.completions.create(
-            model=GROQ_MODEL, messages=messages,
-            max_tokens=4000, temperature=0.35, stream=False,
-        )
-        return resp.choices[0].message.content or "No response generated."
-
-    except Exception as e:
-        return f"⚠️ UI adviser error: {e}\n\n---\n\n{_ui_rule_based()}"
-
-
-def generate_ui_css(approved_titles: list[str], analysis: str,
-                    stream_callback=None) -> str:
-    """
-    Generate targeted CSS for a specific subset of approved proposals.
-    Called when the user approves individual items and clicks Apply.
-    Returns a CSS string (without fences) ready to write to custom_ui.css.
-    """
-    if not HAS_GROQ or not GROQ_API_KEY:
-        return "/* Groq API key required for CSS generation */"
-
-    approved_str = "\n".join(f"- {t}" for t in approved_titles)
-    messages = [
-        {"role": "system", "content": UI_CSS_PROMPT},
-        {"role": "user",   "content":
-            f"Original dashboard analysis:\n{analysis}\n\n"
-            f"The user has approved ONLY these proposals — generate CSS for them:\n"
-            f"{approved_str}\n\n"
-            f"Return a single ```css ... ``` block with all changes."},
-    ]
-
-    try:
-        client = _Groq(api_key=GROQ_API_KEY)
-
-        if stream_callback:
-            full_text = ""
-            stream = client.chat.completions.create(
-                model=GROQ_MODEL, messages=messages,
-                max_tokens=2500, temperature=0.2, stream=True,
-            )
-            for chunk in stream:
-                text = chunk.choices[0].delta.content or ""
-                if text:
-                    full_text += text
-                    stream_callback(text)
-            return full_text
-
-        resp = client.chat.completions.create(
-            model=GROQ_MODEL, messages=messages,
-            max_tokens=2500, temperature=0.2, stream=False,
-        )
-        return resp.choices[0].message.content or "/* No CSS generated */"
-
-    except Exception as e:
-        return f"/* CSS generation error: {e} */"
-
-
-def extract_css_from_response(text: str) -> str:
-    """Pull the raw CSS out of a markdown ```css ... ``` fence."""
-    import re
-    m = re.search(r"```css\s*([\s\S]*?)```", text, re.IGNORECASE)
-    return m.group(1).strip() if m else ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -1121,22 +1066,3 @@ def _rule_based_response(question: str, scan_results: list[dict], simple_mode: b
     return "\n".join(lines)
 
 
-def _ui_rule_based() -> str:
-    return """## 🖌 UI Improvement Proposals
-
-*Add a GROQ_API_KEY for AI-powered comparison against TradingView, Bloomberg, and thinkorswim.*
-
-**1. Collapsible Sidebar** — MEDIUM IMPACT
-Sidebar consumes 22% screen width permanently. A collapse toggle reclaims space for charts.
-
-**2. Watchlist Save/Load** — HIGH IMPACT
-No persistence between sessions. Named watchlist profiles would improve daily workflow.
-
-**3. Auto-Refresh Toggle** — MEDIUM IMPACT
-TradingView refreshes automatically. Optional auto-scan every 15–30 min keeps signals current.
-
-**4. Keyboard Shortcuts** — LOW IMPACT
-`/` to focus search, `S` to scan, arrow keys to navigate symbols.
-
-**5. Chart Drawing Tools** — HIGH IMPACT
-Charts are view-only. Trend lines and support/resistance annotations would be a major upgrade."""
