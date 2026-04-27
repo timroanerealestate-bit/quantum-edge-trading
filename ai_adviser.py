@@ -108,6 +108,23 @@ You ALWAYS validate ideas through multiple data layers before recommending anyth
 The user-provided data already includes multi-layer validation scores — use them.
 
 ════════════════════════════════════════════
+CRITICAL — REAL-TIME OPTIONS DATA ONLY
+════════════════════════════════════════════
+The context you receive contains a "LIVE OPTIONS (REAL DATA)" block for each symbol.
+These blocks show the ACTUAL contracts trading RIGHT NOW from live market data.
+
+✅ YOU MUST use ONLY these values for strikes, expiry dates, and premiums.
+✅ The expiry dates listed are the real upcoming expirations — use ONLY those.
+✅ The ask prices listed are live market prices — use those as your premium estimates.
+❌ NEVER write any expiry date from 2024 or 2025 — those contracts are expired.
+❌ NEVER invent a strike price, expiry date, or premium not present in the data.
+❌ If no LIVE OPTIONS block appears for a symbol, state that chain data was unavailable
+   and skip that symbol — do not fabricate numbers.
+
+Today's date context: You are producing analysis for live trading in 2026.
+All expiry dates must be in 2026 or later. Any 2024/2025 date is an error.
+
+════════════════════════════════════════════
 VALIDATION LAYERS (always present in context)
 ════════════════════════════════════════════
 L1  Momentum + Volume surge   (price action, RSI setup)
@@ -432,31 +449,40 @@ def _get_options_flow(sym: str, price: float) -> dict:
         if now - ts < _opt_ttl():
             return cached
 
-    base = {"unusual": False, "sweep": False, "iv_pct": 50.0, "iv_label": "fair",
-            "pc_ratio": 1.0, "call_vol": 0, "put_vol": 0, "l2a_pts": 0, "details": ""}
+    base = {
+        "unusual": False, "sweep": False, "iv_pct": 50.0, "iv_label": "fair",
+        "pc_ratio": 1.0, "call_vol": 0, "put_vol": 0, "l2a_pts": 0, "details": "",
+        # Real-time options chain data (populated below)
+        "expiries":   [],   # upcoming expiry dates as strings e.g. ["2026-05-02", ...]
+        "real_calls": [],   # [{expiry, strike, ask, bid, otm_pct, volume, iv_pct, breakeven}, ...]
+        "real_puts":  [],
+    }
 
     try:
-        tk      = yf.Ticker(sym)
-        expiries = tk.options
+        tk       = yf.Ticker(sym)
+        expiries = tk.options          # tuple of real upcoming expiry date strings
         if not expiries:
             _OPT_CACHE[sym] = (now, base)
             return base
+
+        # ── Store real upcoming expiry dates ──────────────────────────────────
+        real_expiry_dates = list(expiries[:6])  # e.g. ["2026-05-02", "2026-05-09", ...]
 
         chain = tk.option_chain(expiries[0])
         calls, puts = chain.calls, chain.puts
 
         # ── IV rank (ATM implied volatility) ─────────────────────────────────
-        atm_mask = abs(calls["strike"] - price) / price < 0.05
+        atm_mask  = abs(calls["strike"] - price) / price < 0.05
         atm_calls = calls[atm_mask]
-        iv_raw = float(atm_calls["impliedVolatility"].mean()) * 100 if not atm_calls.empty else 50.0
-        iv_pct = round(min(200.0, iv_raw), 1)
-        iv_label = "cheap" if iv_pct < 30 else ("fair" if iv_pct < 60 else "expensive")
+        iv_raw    = float(atm_calls["impliedVolatility"].mean()) * 100 if not atm_calls.empty else 50.0
+        iv_pct    = round(min(200.0, iv_raw), 1)
+        iv_label  = "cheap" if iv_pct < 30 else ("fair" if iv_pct < 60 else "expensive")
 
         # ── Unusual flow: high vol relative to OI ────────────────────────────
         def _unusual(df):
             df = df.copy()
-            df["vol"]  = df["volume"].fillna(0)
-            df["oi"]   = df["openInterest"].fillna(1).clip(lower=1)
+            df["vol"]   = df["volume"].fillna(0)
+            df["oi"]    = df["openInterest"].fillna(1).clip(lower=1)
             df["ratio"] = df["vol"] / df["oi"]
             return df[(df["vol"] > 300) & (df["ratio"] > 0.5)]
 
@@ -476,29 +502,99 @@ def _get_options_flow(sym: str, price: float) -> dict:
 
         # ── L2a confidence contribution (max 35 pts) ──────────────────────────
         l2a_pts = 0
-        if iv_pct < 30:    l2a_pts += 15  # cheap options = better risk/reward
-        elif iv_pct < 50:  l2a_pts += 10  # fair
-        else:              l2a_pts -= 5   # expensive, penalise
-        if unusual:        l2a_pts += 10  # smart money positioning
-        if sweep:          l2a_pts += 15  # big institutional sweep
+        if iv_pct < 30:   l2a_pts += 15
+        elif iv_pct < 50: l2a_pts += 10
+        else:             l2a_pts -= 5
+        if unusual:       l2a_pts += 10
+        if sweep:         l2a_pts += 15
         l2a_pts = max(0, l2a_pts)
 
         details_parts = []
-        if sweep:    details_parts.append(f"SWEEP detected (max {max(max_call_vol, max_put_vol):,} contracts)")
-        if unusual:  details_parts.append("Unusual vol/OI ratio")
+        if sweep:   details_parts.append(f"SWEEP detected (max {max(max_call_vol, max_put_vol):,} contracts)")
+        if unusual: details_parts.append("Unusual vol/OI ratio")
         details_parts.append(f"P/C={pc_ratio}")
         details_parts.append(f"ATM_IV≈{iv_pct:.0f}% ({iv_label})")
 
+        # ── REAL options candidates — extracted from live chain ───────────────
+        # These are injected into the LLM context so it never has to guess.
+        real_calls: list[dict] = []
+        real_puts:  list[dict] = []
+
+        def _extract_candidates(chain_calls, chain_puts, exp_date: str) -> None:
+            try:
+                # ── Calls: 0–15% OTM, liquid ─────────────────────────────────
+                c = chain_calls.copy()
+                c["ask"]    = c["ask"].fillna(0)
+                c["bid"]    = c["bid"].fillna(0)
+                c["volume"] = c["volume"].fillna(0)
+                c["iv"]     = c["impliedVolatility"].fillna(0)
+                c["otm"]    = ((c["strike"] - price) / price * 100).round(2)
+                good_c = c[
+                    (c["ask"] > 0.01) & (c["volume"] >= 1) &
+                    (c["otm"] >= 0)   & (c["otm"] <= 15)
+                ].sort_values("otm")
+                for _, row in good_c.head(3).iterrows():
+                    real_calls.append({
+                        "expiry":    exp_date,
+                        "strike":    round(float(row["strike"]), 2),
+                        "ask":       round(float(row["ask"]), 2),
+                        "bid":       round(float(row["bid"]), 2),
+                        "otm_pct":   round(float(row["otm"]), 1),
+                        "volume":    int(row["volume"]),
+                        "iv_pct":    round(float(row["iv"]) * 100, 1),
+                        "breakeven": round(float(row["strike"]) + float(row["ask"]), 2),
+                    })
+
+                # ── Puts: 0–15% OTM, liquid ──────────────────────────────────
+                p = chain_puts.copy()
+                p["ask"]    = p["ask"].fillna(0)
+                p["bid"]    = p["bid"].fillna(0)
+                p["volume"] = p["volume"].fillna(0)
+                p["iv"]     = p["impliedVolatility"].fillna(0)
+                p["otm"]    = ((price - p["strike"]) / price * 100).round(2)
+                good_p = p[
+                    (p["ask"] > 0.01) & (p["volume"] >= 1) &
+                    (p["otm"] >= 0)   & (p["otm"] <= 15)
+                ].sort_values("otm")
+                for _, row in good_p.head(3).iterrows():
+                    real_puts.append({
+                        "expiry":    exp_date,
+                        "strike":    round(float(row["strike"]), 2),
+                        "ask":       round(float(row["ask"]), 2),
+                        "bid":       round(float(row["bid"]), 2),
+                        "otm_pct":   round(float(row["otm"]), 1),
+                        "volume":    int(row["volume"]),
+                        "iv_pct":    round(float(row["iv"]) * 100, 1),
+                        "breakeven": round(float(row["strike"]) - float(row["ask"]), 2),
+                    })
+            except Exception:
+                pass
+
+        # Extract from first expiry (already fetched)
+        _extract_candidates(calls, puts, expiries[0])
+
+        # Also pull a second, later expiry for swing/multi-week setups
+        if len(expiries) > 1 and len(real_calls) < 2:
+            try:
+                ch2 = tk.option_chain(expiries[1])
+                _extract_candidates(ch2.calls, ch2.puts, expiries[1])
+            except Exception:
+                pass
+
         result = {
-            "unusual":   unusual,
-            "sweep":     sweep,
-            "iv_pct":    iv_pct,
-            "iv_label":  iv_label,
-            "pc_ratio":  pc_ratio,
-            "call_vol":  total_call,
-            "put_vol":   total_put,
-            "l2a_pts":   l2a_pts,
-            "details":   " | ".join(details_parts),
+            "unusual":    unusual,
+            "sweep":      sweep,
+            "iv_pct":     iv_pct,
+            "iv_label":   iv_label,
+            "pc_ratio":   pc_ratio,
+            "call_vol":   total_call,
+            "put_vol":    total_put,
+            "l2a_pts":    l2a_pts,
+            "details":    " | ".join(details_parts),
+            # Real-time chain data — LLM must use ONLY these values
+            "expiries":   real_expiry_dates,
+            "real_calls": real_calls[:4],
+            "real_puts":  real_puts[:4],
         }
         _OPT_CACHE[sym] = (now, result)
         return result
@@ -800,11 +896,39 @@ def _build_universe_context(screened: dict[str, list[dict]], vix_val: float | No
             if inst.get("details") and inst["details"] != "No notable signals":
                 lines.append(f"    Inst     : {inst['details']}")
 
+            # ── LIVE OPTIONS DATA — LLM must use ONLY these values ────────────
+            expiries   = opt.get("expiries", [])
+            real_calls = opt.get("real_calls", [])
+            real_puts  = opt.get("real_puts", [])
+
+            if expiries or real_calls or real_puts:
+                lines.append(f"    ┌─ LIVE OPTIONS (REAL DATA — use ONLY these values) ─────────────")
+                if expiries:
+                    lines.append(f"    │  Expiries available : {', '.join(expiries[:6])}")
+                for rc in real_calls:
+                    lines.append(
+                        f"    │  CALL  strike=${rc['strike']:.2f} ({rc['otm_pct']:+.1f}% OTM)"
+                        f"  exp={rc['expiry']}  ask=${rc['ask']:.2f}  bid=${rc['bid']:.2f}"
+                        f"  vol={rc['volume']:,}  IV={rc['iv_pct']:.0f}%  breakeven=${rc['breakeven']:.2f}"
+                    )
+                for rp in real_puts:
+                    lines.append(
+                        f"    │  PUT   strike=${rp['strike']:.2f} ({rp['otm_pct']:+.1f}% OTM)"
+                        f"  exp={rp['expiry']}  ask=${rp['ask']:.2f}  bid=${rp['bid']:.2f}"
+                        f"  vol={rp['volume']:,}  IV={rp['iv_pct']:.0f}%  breakeven=${rp['breakeven']:.2f}"
+                    )
+                if not real_calls and not real_puts:
+                    lines.append(f"    │  No liquid near-the-money contracts available at this time.")
+                lines.append(f"    └────────────────────────────────────────────────────────────────")
+
             lines.append("")
 
     lines.append(
         "NOTE: Use this data to produce trade cards in the required format. "
-        "Only recommend HIGH and MEDIUM confidence plays."
+        "Only recommend HIGH and MEDIUM confidence plays.\n"
+        "CRITICAL: For every trade card you write, the Strike, Expiry, and Premium MUST "
+        "come from the LIVE OPTIONS block shown above for that symbol. "
+        "Never use expiry dates from 2024 or 2025 — those are expired contracts."
     )
     return "\n".join(lines)
 
