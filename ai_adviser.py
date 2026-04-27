@@ -17,13 +17,15 @@ Confidence scoring (0-100):
   LOW    < 50  — mixed signals, excluded from recommendations
 """
 from __future__ import annotations
+import os
 import time
 import requests
 import yfinance as yf
 import pandas as pd
 
-# ── API keys — injected by dashboard.py from st.secrets after Streamlit starts ─
-# Do NOT read from os.getenv / .env — keys come exclusively from Streamlit secrets.
+# ── API keys — injected by dashboard.py at startup ────────────────────────────
+# Primary source: module-level vars set by dashboard.py from st.secrets.
+# Each function also checks os.environ as a final fallback.
 GROQ_API_KEY     = ""
 AV_API_KEY       = ""
 MA_API_TOKEN     = ""
@@ -1094,13 +1096,14 @@ def _ask_groq_http(messages: list[dict], model: str, max_tokens: int = 3500) -> 
     Bypasses the groq SDK entirely — no package dependency issues.
     Returns empty string on any failure — never raises.
     """
-    if not GROQ_API_KEY:
+    key = GROQ_API_KEY or os.environ.get("GROQ_API_KEY", "")
+    if not key:
         return ""
     try:
         resp = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Authorization": f"Bearer {key}",
                 "Content-Type":  "application/json",
             },
             json={
@@ -1122,10 +1125,11 @@ def _ask_groq_http(messages: list[dict], model: str, max_tokens: int = 3500) -> 
 # ═══════════════════════════════════════════════════════════════════════════════
 def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
     """
-    Silent fallback to Gemini 1.5 Pro via REST API.
+    Silent fallback to Gemini 1.5 Flash via REST API.
     Returns empty string if key is missing or call fails — never raises.
     """
-    if not GEMINI_API_KEY:
+    key = GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+    if not key:
         return ""
     try:
         system_text = next(
@@ -1136,7 +1140,7 @@ def _ask_gemini(messages: list[dict], max_tokens: int = 3500) -> str:
         )
         url = (
             "https://generativelanguage.googleapis.com/v1beta"
-            f"/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+            f"/models/gemini-1.5-flash:generateContent?key={key}"
         )
         payload = {
             "systemInstruction": {"parts": [{"text": system_text}]},
@@ -1171,8 +1175,10 @@ def ask_adviser(
     if scan_results is None:
         scan_results = []
 
-    # Bail only if no AI key is available at all
-    if not GROQ_API_KEY and not GEMINI_API_KEY:
+    # Bail only if no AI key is available through any channel
+    _groq_key   = GROQ_API_KEY   or os.environ.get("GROQ_API_KEY",   "")
+    _gemini_key = GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+    if not _groq_key and not _gemini_key:
         return _rule_based_response(question, scan_results, simple_mode)
 
     # ── Full multi-layer validation (every query) ─────────────────────────────

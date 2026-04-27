@@ -6,6 +6,7 @@ Run with:  streamlit run dashboard.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+import os
 
 # ─── Page config MUST be first Streamlit call ─────────────────────────────────
 st.set_page_config(
@@ -25,35 +26,39 @@ from options_analyzer import summarize_options
 import news_ticker as nt
 from streamlit_autorefresh import st_autorefresh
 
-# ─── API Key resolution — Streamlit secrets only ──────────────────────────────
-# Locally:  reads from .streamlit/secrets.toml
-# On Cloud: reads from Streamlit Cloud Settings → Secrets
+# ─── API Key resolution ───────────────────────────────────────────────────────
+# Priority: st.secrets (Streamlit Cloud / local secrets.toml) → os.environ
+# Never raises — always returns a string (empty if missing).
 
-def _secret(key: str, default: str = "") -> str:
-    """Fetch a secret by name — tries both access styles, never raises."""
+def _get_key(name: str) -> str:
+    """Return the API key string or '' — tries every access method."""
+    # 1. st.secrets bracket access (works in all Streamlit versions)
     try:
-        v = st.secrets.get(key)
-        if v:
-            return str(v)
+        val = st.secrets[name]
+        if val and str(val).strip():
+            return str(val).strip()
     except Exception:
         pass
+    # 2. st.secrets.get() (Streamlit >= 0.86 UserDict style)
     try:
-        v = st.secrets[key]
-        if v:
-            return str(v)
+        val = st.secrets.get(name, "")
+        if val and str(val).strip():
+            return str(val).strip()
     except Exception:
         pass
-    return default
+    # 3. Environment variable (covers docker / custom deployments)
+    val = os.environ.get(name, "")
+    return val.strip() if val else ""
 
-# Load every key once, up front
-_GROQ_KEY   = _secret("GROQ_API_KEY")
-_GEMINI_KEY = _secret("GEMINI_API_KEY")
-_AV_KEY     = _secret("ALPHA_VANTAGE_API_KEY")
-_MA_KEY     = _secret("MARKETAUX_API_TOKEN")
-_FH_KEY     = _secret("FINNHUB_API_KEY")
-_GROK_KEY   = _secret("GROK_API_KEY")
+# ── Load all keys up front ─────────────────────────────────────────────────
+_GROQ_KEY   = _get_key("GROQ_API_KEY")
+_GEMINI_KEY = _get_key("GEMINI_API_KEY")
+_AV_KEY     = _get_key("ALPHA_VANTAGE_API_KEY")
+_MA_KEY     = _get_key("MARKETAUX_API_TOKEN")
+_FH_KEY     = _get_key("FINNHUB_API_KEY")
+_GROK_KEY   = _get_key("GROK_API_KEY")
 
-# Inject into adviser module immediately — before any other logic
+# ── Inject into adviser immediately (before any other logic) ───────────────
 adviser.GROQ_API_KEY    = _GROQ_KEY
 adviser.GEMINI_API_KEY  = _GEMINI_KEY
 adviser.AV_API_KEY      = _AV_KEY
@@ -63,7 +68,7 @@ adviser.GROK_API_KEY    = _GROK_KEY
 adviser.HAS_GROQ        = adviser._GROQ_INSTALLED and bool(_GROQ_KEY)
 adviser.HAS_GROK_LAYER  = adviser._OPENAI_INSTALLED and bool(_GROK_KEY)
 
-# Only halt if neither AI provider is available
+# ── Only stop if NEITHER AI provider has a key ────────────────────────────
 if not _GROQ_KEY and not _GEMINI_KEY:
     st.error(
         "🔑 **No AI provider available.** "
