@@ -1033,12 +1033,12 @@ def _validate_with_deepseek(
     vix_val:       float | None = None,
 ) -> str:
     """
-    Pass the main analysis to DeepSeek for final validation.
-    DeepSeek reviews recommendations, adds confidence scores, flags risks,
-    and appends a concise final verdict section.
+    Silent pre-publication filter — DeepSeek independently reviews each trade
+    card and returns ONLY the ones it agrees with, in the exact same format.
 
-    Silently returns the original analysis unchanged if DeepSeek is
-    unavailable for any reason — no error messages surfaced to the user.
+    The user never sees this process. The output looks identical to the original
+    except only validated trades pass through. If DeepSeek is unavailable,
+    the original unfiltered analysis is returned silently.
     """
     key = DEEPSEEK_API_KEY or os.environ.get("DEEPSEEK_API_KEY", "")
     if not key:
@@ -1046,24 +1046,26 @@ def _validate_with_deepseek(
 
     vix_str = f"{vix_val:.1f}" if vix_val is not None else "N/A"
 
-    validation_prompt = f"""You are a senior quant risk analyst reviewing AI-generated trade recommendations.
+    validation_prompt = f"""You are a senior quant risk analyst acting as a final quality gate for trade recommendations.
 
-Review the following trade cards and append a **📊 DeepSeek Validation** section at the end.
-Do NOT rewrite, reformat, or remove any existing cards. Only add the section below.
+Your job: review each trade card below and return ONLY the ones you independently agree with.
 
-Your validation section must include:
-1. A one-line overall verdict on the quality of today's setup batch.
-2. For each trade symbol mentioned, a single bullet:
-   `• [SYMBOL] — [CONFIRM / REDUCE SIZE / SKIP] — [one-sentence reason]`
-3. The single biggest macro or systemic risk to all these positions right now.
-4. One sentence on what VIX={vix_str} means for sizing these trades.
+RULES — follow exactly:
+• Evaluate each trade on its own merits: is the setup technically sound? Is the confidence level justified by the data given? Is the risk/reward reasonable given VIX={vix_str}?
+• KEEP trades you agree with — output them in the EXACT same card format, unchanged.
+• DROP trades you disagree with — simply omit them, no explanation needed.
+• Preserve the --- dividers between cards you keep.
+• Do NOT add any commentary, validation notes, disclaimers, or extra sections.
+• Do NOT mention this filtering process anywhere in the output.
+• Do NOT change any numbers, dates, strikes, or wording in the cards you keep.
+• Output the kept cards as if they are the complete final result.
 
-Keep the whole section under 200 words. Be direct and honest — do not repeat what was already said in the cards.
+If you agree with all trades, return all of them unchanged.
+If you agree with none, return the single best one rather than an empty response.
 
-Original question: {question}
 Current VIX: {vix_str}
 
-=== TRADE ANALYSIS TO REVIEW ===
+=== TRADE CARDS TO REVIEW ===
 {main_analysis}
 === END ==="""
 
@@ -1077,17 +1079,17 @@ Current VIX: {vix_str}
             json={
                 "model":       "deepseek-chat",
                 "messages":    [{"role": "user", "content": validation_prompt}],
-                "max_tokens":  600,
-                "temperature": 0.3,
+                "max_tokens":  4000,   # must be large enough to return all cards
+                "temperature": 0.2,   # low temp = consistent, decisive filtering
             },
-            timeout=45,
+            timeout=60,
         )
         resp.raise_for_status()
-        verdict = resp.json()["choices"][0]["message"]["content"] or ""
-        if verdict.strip():
-            return main_analysis + "\n\n---\n\n" + verdict.strip()
+        validated = resp.json()["choices"][0]["message"]["content"] or ""
+        if validated.strip():
+            return validated.strip()
     except Exception:
-        pass   # DeepSeek unavailable — silently skip
+        pass   # DeepSeek unavailable — return original unfiltered, silently
 
     return main_analysis
 
