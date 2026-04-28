@@ -1033,39 +1033,43 @@ def _validate_with_deepseek(
     vix_val:       float | None = None,
 ) -> str:
     """
-    Silent pre-publication filter — DeepSeek independently reviews each trade
-    card and returns ONLY the ones it agrees with, in the exact same format.
+    DeepSeek consensus layer — independently reviews the main analysis,
+    cross-checks reasoning, calibrates confidence, strengthens risks, and
+    produces the best possible unified final answer.
 
-    The user never sees this process. The output looks identical to the original
-    except only validated trades pass through. If DeepSeek is unavailable,
-    the original unfiltered analysis is returned silently.
+    Errors are stored in _deepseek_last_err[0] so ask_adviser can show a
+    subtle status note. If unavailable, returns the original analysis unchanged.
     """
+    _deepseek_last_err[0] = ""
     key = DEEPSEEK_API_KEY or os.environ.get("DEEPSEEK_API_KEY", "")
     if not key:
+        _deepseek_last_err[0] = "no_key"
         return main_analysis
 
     vix_str = f"{vix_val:.1f}" if vix_val is not None else "N/A"
 
-    validation_prompt = f"""You are a senior quant risk analyst acting as a final quality gate for trade recommendations.
+    consensus_prompt = f"""You are a senior quantitative trading strategist providing independent consensus validation.
 
-Your job: review each trade card below and return ONLY the ones you independently agree with.
+A multi-layer AI system has produced the following trade recommendations. Your role is to produce the final, best-possible version by:
 
-RULES — follow exactly:
-• Evaluate each trade on its own merits: is the setup technically sound? Is the confidence level justified by the data given? Is the risk/reward reasonable given VIX={vix_str}?
-• KEEP trades you agree with — output them in the EXACT same card format, unchanged.
-• DROP trades you disagree with — simply omit them, no explanation needed.
-• Preserve the --- dividers between cards you keep.
-• Do NOT add any commentary, validation notes, disclaimers, or extra sections.
-• Do NOT mention this filtering process anywhere in the output.
-• Do NOT change any numbers, dates, strikes, or wording in the cards you keep.
-• Output the kept cards as if they are the complete final result.
+1. CROSS-CHECK each trade's reasoning — does the data actually support the setup?
+2. CALIBRATE confidence — adjust the % up or down if the evidence warrants it; be honest
+3. STRENGTHEN risks — rewrite or expand "What Could Go Wrong" with any missed or more specific risks
+4. VALIDATE options data — confirm strikes and expiry dates look realistic for 2026
+5. OUTPUT one clean unified final answer in the EXACT same card format
 
-If you agree with all trades, return all of them unchanged.
-If you agree with none, return the single best one rather than an empty response.
+RULES:
+• Preserve all market data exactly: strikes, expiry dates, current prices, premiums
+• Keep all trades unless a setup is fundamentally unsound — in that case drop it
+• Do NOT add a "validation section", "DeepSeek notes", or any meta-commentary
+• Do NOT reference two AI systems or any validation process — write as one expert voice
+• Do NOT add new trade symbols not in the original
+• The output must be clean trade cards exactly like the input format, nothing extra
 
 Current VIX: {vix_str}
+Today's date context: Live trading session 2026.
 
-=== TRADE CARDS TO REVIEW ===
+=== INCOMING ANALYSIS ===
 {main_analysis}
 === END ==="""
 
@@ -1078,25 +1082,35 @@ Current VIX: {vix_str}
             },
             json={
                 "model":       "deepseek-chat",
-                "messages":    [{"role": "user", "content": validation_prompt}],
-                "max_tokens":  4000,   # must be large enough to return all cards
-                "temperature": 0.2,   # low temp = consistent, decisive filtering
+                "messages":    [{"role": "user", "content": consensus_prompt}],
+                "max_tokens":  3500,
+                "temperature": 0.25,
             },
             timeout=60,
         )
+        if resp.status_code == 429:
+            _deepseek_last_err[0] = "rate_limit"
+            return main_analysis
+        if resp.status_code == 402:
+            _deepseek_last_err[0] = "quota"
+            return main_analysis
         resp.raise_for_status()
-        validated = resp.json()["choices"][0]["message"]["content"] or ""
-        if validated.strip():
-            return validated.strip()
-    except Exception:
-        pass   # DeepSeek unavailable — return original unfiltered, silently
+        consensus = resp.json()["choices"][0]["message"]["content"] or ""
+        if consensus.strip():
+            return consensus.strip()
+        _deepseek_last_err[0] = "empty_response"
+    except requests.exceptions.Timeout:
+        _deepseek_last_err[0] = "timeout"
+    except Exception as e:
+        _deepseek_last_err[0] = str(e)[:80]
 
     return main_analysis
 
 
 # Module-level slots that capture the last failure reason for each provider.
-_groq_last_err:   list[str] = [""]
-_gemini_last_err: list[str] = [""]
+_groq_last_err:     list[str] = [""]
+_gemini_last_err:   list[str] = [""]
+_deepseek_last_err: list[str] = [""]
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # GROQ HTTP  (bypasses the groq package — works on any environment)
@@ -1290,42 +1304,74 @@ My question: {question}{mode_tag}"""
     gemini_messages = _build_gemini_messages(universe_ctx)
     groq_model      = _pick_groq_model(question)
 
+    # ── Reset error slots for this request ───────────────────────────────────
+    _groq_last_err[0]     = ""
+    _gemini_last_err[0]   = ""
+    _deepseek_last_err[0] = ""
+    _status_notes: list[str] = []
+
     # ── Try Groq via HTTP (compact prompt, no SDK dependency) ─────────────────
-    # max_tokens=1800: Groq free tier caps input+output per request ~4096 tokens.
-    # Compact system (~365t) + universe_ctx (~1200t) + question (~50t) ≈ 1615 input.
-    # 1615 + 1800 = 3415 — safely under the limit.
     ai_text = _ask_groq_http(groq_messages, groq_model, max_tokens=1800)
 
-    # If Groq still 413, trim context further and retry with lower max_tokens
+    # If 413, trim context hard and retry once at lower token budget
     if not ai_text and _groq_last_err[0] == "payload_too_large":
         trimmed_ctx     = universe_ctx[:3_000] + "\n[context trimmed]"
         groq_messages   = _build_groq_messages(trimmed_ctx)
         gemini_messages = _build_gemini_messages(trimmed_ctx)
         ai_text         = _ask_groq_http(groq_messages, groq_model, max_tokens=1200)
 
-    # ── Silent fallback: Gemini (full prompt, higher limits) ──────────────────
+    # ── Track Groq failure reason ─────────────────────────────────────────────
+    if not ai_text:
+        _err = _groq_last_err[0]
+        if _err in ("no_key", "invalid_key"):
+            _status_notes.append("Groq unavailable (key)")
+        elif _err == "payload_too_large":
+            _status_notes.append("Groq unavailable (bandwidth)")
+        elif _err == "rate_limit":
+            _status_notes.append("Groq unavailable (rate limit)")
+        elif _err:
+            _status_notes.append("Groq unavailable (timeout)")
+        else:
+            _status_notes.append("Groq unavailable")
+
+    # ── Fallback: Gemini (full prompt, no payload size constraint) ────────────
     if not ai_text:
         ai_text = _ask_gemini(gemini_messages)
+        if ai_text:
+            _status_notes.append("Gemini fallback active")
+        else:
+            _gerr = _gemini_last_err[0]
+            if "429" in _gerr or "ratelimit" in _gerr.lower():
+                _status_notes.append("Gemini unavailable (rate limit)")
+            elif "no_key" in _gerr:
+                _status_notes.append("Gemini unavailable (key)")
+            elif _gerr:
+                _status_notes.append("Gemini unavailable (timeout)")
+            else:
+                _status_notes.append("Gemini unavailable")
 
+    # ── Both providers failed — last resort message ───────────────────────────
     if not ai_text:
-        # ── Temporary diagnostics — remove once root cause confirmed ─────────
-        _groq_key_present   = bool(GROQ_API_KEY or os.environ.get("GROQ_API_KEY", ""))
-        _gemini_key_present = bool(GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", ""))
-        _ctx_len            = len(universe_ctx)
-        _sys_len            = len(_GROQ_COMPACT_SYSTEM)
-        return (
-            f"⚠️ **Debug — both providers failed.**\n\n"
-            f"- Groq key present: `{_groq_key_present}`\n"
-            f"- Gemini key present: `{_gemini_key_present}`\n"
-            f"- Groq last error: `{_groq_last_err[0] or 'none'}`\n"
-            f"- Gemini last error: `{_gemini_last_err[0] or 'none'}`\n"
-            f"- Universe context length: `{_ctx_len:,}` chars\n"
-            f"- Compact system prompt length: `{_sys_len:,}` chars\n"
-            f"- Groq model attempted: `{groq_model}`\n"
-        )
+        note = " · ".join(_status_notes) if _status_notes else "all providers unavailable"
+        return f"*⚠ {note}*\n\nThe Research Agent is temporarily unavailable. Please try again in a moment."
 
-    # ── DeepSeek final validation layer ──────────────────────────────────────
+    # ── DeepSeek consensus layer ──────────────────────────────────────────────
     final = _validate_with_deepseek(ai_text, question, vix_val)
+
+    # ── Prepend subtle status line if any service was degraded ───────────────
+    _ds_err = _deepseek_last_err[0]
+    if _ds_err:
+        if _ds_err == "rate_limit":
+            _status_notes.append("DeepSeek unavailable (rate limit)")
+        elif _ds_err == "timeout":
+            _status_notes.append("DeepSeek unavailable (timeout)")
+        elif _ds_err == "quota":
+            _status_notes.append("DeepSeek unavailable (quota)")
+        elif _ds_err != "no_key":
+            _status_notes.append("DeepSeek unavailable")
+
+    if _status_notes:
+        final = f"*⚠ {' · '.join(_status_notes)}*\n\n{final}"
 
     if stream_callback:
         stream_callback(final)
