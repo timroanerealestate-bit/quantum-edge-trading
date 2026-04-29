@@ -1220,103 +1220,72 @@ _render_ticker(_ticker_items)
 
 # ─── Real-Time Market Analysis ────────────────────────────────────────────────
 
-# AV full sector name → local heatmap key
-_AV_SECTOR_MAP = {
-    "Information Technology": "Technology",
-    "Financials":             "Financials",
-    "Energy":                 "Energy",
-    "Health Care":            "Health Care",
-    "Industrials":            "Industrials",
-    "Communication Services": "Comm Svcs",
-    "Consumer Discretionary": "Cons Discr",
-    "Consumer Staples":       "Cons Staples",
-    "Materials":              "Materials",
-    "Real Estate":            "Real Estate",
-    "Utilities":              "Utilities",
-}
-
-def _fetch_av_sector_perf(av_key: str) -> dict | None:
-    """Call AV SECTOR endpoint. Returns {full_sector_name: float_pct} or None."""
-    if not av_key:
-        return None
+def _fetch_rtma_data() -> dict | None:
+    """
+    Fresh sector + stock % change data via yfinance sector ETFs (XLK, XLF …).
+    Returns the full heatmap dict {sectors:[…], stocks:{…}} or None on failure.
+    AV SECTOR endpoint is premium-only so we use live ETF prices instead.
+    """
     try:
-        r = requests.get(
-            "https://www.alphavantage.co/query",
-            params={"function": "SECTOR", "apikey": av_key},
-            timeout=10,
-        )
-        raw = r.json().get("Rank A: Real-Time Performance", {})
-        if not raw:
-            return None
-        return {
-            k: float(str(v).replace("%", "").strip())
-            for k, v in raw.items()
-            if v not in (None, "")
-        }
+        data = md.get_heatmap_data()   # always fetches fresh — bypasses session cache
+        if data and data.get("sectors"):
+            return data
+        return None
     except Exception:
         return None
 
-# Button — spans full width, matches dashboard's uppercase label style
-st.markdown(
-    "<div style='margin:10px 0 6px;'>",
-    unsafe_allow_html=True,
-)
+# Button — spans full width
 if st.button(
     "📡  Real-Time Market Analysis",
     key="rtma_btn",
     use_container_width=True,
-    help="Fetches live sector performance from Alpha Vantage",
+    help="Pulls live sector ETF performance via yfinance",
 ):
     with st.spinner("Fetching live sector data…"):
-        _result = _fetch_av_sector_perf(_AV_KEY)
-        if _result:
-            st.session_state["rtma_data"]    = _result
-            st.session_state["rtma_ts"]      = datetime.now().strftime("%H:%M:%S")
-            st.session_state["rtma_expanded"] = True
-        else:
-            st.session_state["rtma_data"]    = {}
-            st.session_state["rtma_ts"]      = None
-            st.session_state["rtma_expanded"] = True
-st.markdown("</div>", unsafe_allow_html=True)
+        _result = _fetch_rtma_data()
+        st.session_state["rtma_data"]     = _result or {}
+        st.session_state["rtma_ts"]       = datetime.now().strftime("%H:%M:%S") if _result else None
+        st.session_state["rtma_expanded"] = True
 
-_rtma = st.session_state.get("rtma_data")
-if _rtma is not None:
+_rtma_raw = st.session_state.get("rtma_data")
+if _rtma_raw is not None:
     _rtma_ts = st.session_state.get("rtma_ts", "")
     _expander_label = (
         f"📊 Real-Time Sector Breakdown{'  ·  ' + _rtma_ts if _rtma_ts else ''}"
     )
     with st.expander(_expander_label, expanded=st.session_state.get("rtma_expanded", True)):
-        if not _rtma:
-            st.warning("Could not fetch sector data — Alpha Vantage may be rate-limited. Try again in a moment.")
+        if not _rtma_raw:
+            st.warning("Could not fetch sector data. Try again in a moment.")
         else:
+            # sectors: [{name, symbol, change_pct}, …]
+            _sectors  = _rtma_raw.get("sectors", [])
+            _hm_stocks = _rtma_raw.get("stocks", {})
+
             _winners = sorted(
-                [(k, v) for k, v in _rtma.items() if v > 0], key=lambda x: -x[1]
+                [s for s in _sectors if s["change_pct"] > 0],
+                key=lambda x: -x["change_pct"],
             )
             _losers = sorted(
-                [(k, v) for k, v in _rtma.items() if v <= 0], key=lambda x: x[1]
+                [s for s in _sectors if s["change_pct"] <= 0],
+                key=lambda x: x["change_pct"],
             )
 
-            # ── Top / worst stock lookup from heatmap session cache ───────────
-            _hm_stocks = st.session_state.get("heatmap_data", {}).get("stocks", {})
-
-            def _best_stock_in(av_name: str) -> tuple[str, float]:
-                local = _AV_SECTOR_MAP.get(av_name, "")
-                stocks = _hm_stocks.get(local, [])
+            def _best_stock_in(sector_name: str) -> tuple[str, float]:
+                stocks = _hm_stocks.get(sector_name, [])
                 if not stocks:
                     return "—", 0.0
                 s = max(stocks, key=lambda x: x["change_pct"])
                 return s["symbol"], s["change_pct"]
 
-            def _worst_stock_in(av_name: str) -> tuple[str, float]:
-                local = _AV_SECTOR_MAP.get(av_name, "")
-                stocks = _hm_stocks.get(local, [])
+            def _worst_stock_in(sector_name: str) -> tuple[str, float]:
+                stocks = _hm_stocks.get(sector_name, [])
                 if not stocks:
                     return "—", 0.0
                 s = min(stocks, key=lambda x: x["change_pct"])
                 return s["symbol"], s["change_pct"]
 
-            _top_sector   = _winners[0][0] if _winners else None
-            _worst_sector = _losers[0][0]  if _losers  else None
+            _top_sector   = _winners[0]["name"] if _winners else None
+            _worst_sector = _losers[0]["name"]  if _losers  else None
 
             # ── Sector columns ────────────────────────────────────────────────
             _c1, _c2 = st.columns(2)
@@ -1327,14 +1296,14 @@ if _rtma is not None:
                     "🟢 Winning Sectors</div>",
                     unsafe_allow_html=True,
                 )
-                for _name, _pct in _winners:
-                    _star = " ⭐" if _name == _top_sector else ""
+                for _s in _winners:
+                    _star = " ⭐" if _s["name"] == _top_sector else ""
                     st.markdown(
                         f"<div style='display:flex;justify-content:space-between;"
                         f"padding:3px 0;border-bottom:1px solid rgba(16,255,176,0.08);'>"
-                        f"<span style='color:#c8d6e5;font-size:13px;'>{_name}{_star}</span>"
+                        f"<span style='color:#c8d6e5;font-size:13px;'>{_s['name']}{_star}</span>"
                         f"<span style='color:#10ffb0;font-weight:700;font-size:13px;'>"
-                        f"+{_pct:.2f}%</span></div>",
+                        f"+{_s['change_pct']:.2f}%</span></div>",
                         unsafe_allow_html=True,
                     )
             with _c2:
@@ -1344,14 +1313,14 @@ if _rtma is not None:
                     "🔴 Losing Sectors</div>",
                     unsafe_allow_html=True,
                 )
-                for _name, _pct in _losers:
-                    _star = " ⭐" if _name == _worst_sector else ""
+                for _s in _losers:
+                    _star = " ⭐" if _s["name"] == _worst_sector else ""
                     st.markdown(
                         f"<div style='display:flex;justify-content:space-between;"
                         f"padding:3px 0;border-bottom:1px solid rgba(255,61,87,0.08);'>"
-                        f"<span style='color:#c8d6e5;font-size:13px;'>{_name}{_star}</span>"
+                        f"<span style='color:#c8d6e5;font-size:13px;'>{_s['name']}{_star}</span>"
                         f"<span style='color:#ff3d57;font-weight:700;font-size:13px;'>"
-                        f"{_pct:.2f}%</span></div>",
+                        f"{_s['change_pct']:.2f}%</span></div>",
                         unsafe_allow_html=True,
                     )
 
@@ -1391,7 +1360,7 @@ if _rtma is not None:
             st.markdown("</div>", unsafe_allow_html=True)
 
             if _rtma_ts:
-                st.caption(f"Data as of {_rtma_ts} · Source: Alpha Vantage")
+                st.caption(f"Data as of {_rtma_ts} · Source: yfinance sector ETFs (XLK, XLF, XLE…)")
 
 
 # ─── Dynamic TTL: short when market is open, longer when closed ───────────────
