@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import os
+import requests
 
 # ─── Page config MUST be first Streamlit call ─────────────────────────────────
 st.set_page_config(
@@ -1215,6 +1216,182 @@ _ticker_items = _load_ticker(
     _AV_KEY,
 )
 _render_ticker(_ticker_items)
+
+
+# ─── Real-Time Market Analysis ────────────────────────────────────────────────
+
+# AV full sector name → local heatmap key
+_AV_SECTOR_MAP = {
+    "Information Technology": "Technology",
+    "Financials":             "Financials",
+    "Energy":                 "Energy",
+    "Health Care":            "Health Care",
+    "Industrials":            "Industrials",
+    "Communication Services": "Comm Svcs",
+    "Consumer Discretionary": "Cons Discr",
+    "Consumer Staples":       "Cons Staples",
+    "Materials":              "Materials",
+    "Real Estate":            "Real Estate",
+    "Utilities":              "Utilities",
+}
+
+def _fetch_av_sector_perf(av_key: str) -> dict | None:
+    """Call AV SECTOR endpoint. Returns {full_sector_name: float_pct} or None."""
+    if not av_key:
+        return None
+    try:
+        r = requests.get(
+            "https://www.alphavantage.co/query",
+            params={"function": "SECTOR", "apikey": av_key},
+            timeout=10,
+        )
+        raw = r.json().get("Rank A: Real-Time Performance", {})
+        if not raw:
+            return None
+        return {
+            k: float(str(v).replace("%", "").strip())
+            for k, v in raw.items()
+            if v not in (None, "")
+        }
+    except Exception:
+        return None
+
+# Button — spans full width, matches dashboard's uppercase label style
+st.markdown(
+    "<div style='margin:10px 0 6px;'>",
+    unsafe_allow_html=True,
+)
+if st.button(
+    "📡  Real-Time Market Analysis",
+    key="rtma_btn",
+    use_container_width=True,
+    help="Fetches live sector performance from Alpha Vantage",
+):
+    with st.spinner("Fetching live sector data…"):
+        _result = _fetch_av_sector_perf(_AV_KEY)
+        if _result:
+            st.session_state["rtma_data"]    = _result
+            st.session_state["rtma_ts"]      = datetime.now().strftime("%H:%M:%S")
+            st.session_state["rtma_expanded"] = True
+        else:
+            st.session_state["rtma_data"]    = {}
+            st.session_state["rtma_ts"]      = None
+            st.session_state["rtma_expanded"] = True
+st.markdown("</div>", unsafe_allow_html=True)
+
+_rtma = st.session_state.get("rtma_data")
+if _rtma is not None:
+    _rtma_ts = st.session_state.get("rtma_ts", "")
+    _expander_label = (
+        f"📊 Real-Time Sector Breakdown{'  ·  ' + _rtma_ts if _rtma_ts else ''}"
+    )
+    with st.expander(_expander_label, expanded=st.session_state.get("rtma_expanded", True)):
+        if not _rtma:
+            st.warning("Could not fetch sector data — Alpha Vantage may be rate-limited. Try again in a moment.")
+        else:
+            _winners = sorted(
+                [(k, v) for k, v in _rtma.items() if v > 0], key=lambda x: -x[1]
+            )
+            _losers = sorted(
+                [(k, v) for k, v in _rtma.items() if v <= 0], key=lambda x: x[1]
+            )
+
+            # ── Top / worst stock lookup from heatmap session cache ───────────
+            _hm_stocks = st.session_state.get("heatmap_data", {}).get("stocks", {})
+
+            def _best_stock_in(av_name: str) -> tuple[str, float]:
+                local = _AV_SECTOR_MAP.get(av_name, "")
+                stocks = _hm_stocks.get(local, [])
+                if not stocks:
+                    return "—", 0.0
+                s = max(stocks, key=lambda x: x["change_pct"])
+                return s["symbol"], s["change_pct"]
+
+            def _worst_stock_in(av_name: str) -> tuple[str, float]:
+                local = _AV_SECTOR_MAP.get(av_name, "")
+                stocks = _hm_stocks.get(local, [])
+                if not stocks:
+                    return "—", 0.0
+                s = min(stocks, key=lambda x: x["change_pct"])
+                return s["symbol"], s["change_pct"]
+
+            _top_sector   = _winners[0][0] if _winners else None
+            _worst_sector = _losers[0][0]  if _losers  else None
+
+            # ── Sector columns ────────────────────────────────────────────────
+            _c1, _c2 = st.columns(2)
+            with _c1:
+                st.markdown(
+                    "<div style='font-size:12px;font-weight:700;letter-spacing:1.2px;"
+                    "color:#10ffb0;text-transform:uppercase;margin-bottom:6px;'>"
+                    "🟢 Winning Sectors</div>",
+                    unsafe_allow_html=True,
+                )
+                for _name, _pct in _winners:
+                    _star = " ⭐" if _name == _top_sector else ""
+                    st.markdown(
+                        f"<div style='display:flex;justify-content:space-between;"
+                        f"padding:3px 0;border-bottom:1px solid rgba(16,255,176,0.08);'>"
+                        f"<span style='color:#c8d6e5;font-size:13px;'>{_name}{_star}</span>"
+                        f"<span style='color:#10ffb0;font-weight:700;font-size:13px;'>"
+                        f"+{_pct:.2f}%</span></div>",
+                        unsafe_allow_html=True,
+                    )
+            with _c2:
+                st.markdown(
+                    "<div style='font-size:12px;font-weight:700;letter-spacing:1.2px;"
+                    "color:#ff3d57;text-transform:uppercase;margin-bottom:6px;'>"
+                    "🔴 Losing Sectors</div>",
+                    unsafe_allow_html=True,
+                )
+                for _name, _pct in _losers:
+                    _star = " ⭐" if _name == _worst_sector else ""
+                    st.markdown(
+                        f"<div style='display:flex;justify-content:space-between;"
+                        f"padding:3px 0;border-bottom:1px solid rgba(255,61,87,0.08);'>"
+                        f"<span style='color:#c8d6e5;font-size:13px;'>{_name}{_star}</span>"
+                        f"<span style='color:#ff3d57;font-weight:700;font-size:13px;'>"
+                        f"{_pct:.2f}%</span></div>",
+                        unsafe_allow_html=True,
+                    )
+
+            # ── Top / worst stock highlight ───────────────────────────────────
+            st.markdown("<div style='margin-top:14px;'>", unsafe_allow_html=True)
+            _sc1, _sc2 = st.columns(2)
+            with _sc1:
+                if _top_sector:
+                    _sym, _spct = _best_stock_in(_top_sector)
+                    _pct_fmt = f"+{_spct:.2f}%" if _spct >= 0 else f"{_spct:.2f}%"
+                    st.markdown(
+                        f"<div style='background:rgba(16,255,176,0.06);border:1px solid "
+                        f"rgba(16,255,176,0.2);border-radius:8px;padding:10px 14px;'>"
+                        f"<div style='font-size:11px;color:#8892a4;letter-spacing:1px;"
+                        f"text-transform:uppercase;margin-bottom:4px;'>"
+                        f"🏆 Top Stock · {_top_sector}</div>"
+                        f"<div style='font-size:1.3rem;font-weight:700;color:#10ffb0;'>"
+                        f"{_sym} &nbsp;<span style='font-size:1rem;'>{_pct_fmt}</span></div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+            with _sc2:
+                if _worst_sector:
+                    _sym, _spct = _worst_stock_in(_worst_sector)
+                    _pct_fmt = f"{_spct:.2f}%"
+                    st.markdown(
+                        f"<div style='background:rgba(255,61,87,0.06);border:1px solid "
+                        f"rgba(255,61,87,0.2);border-radius:8px;padding:10px 14px;'>"
+                        f"<div style='font-size:11px;color:#8892a4;letter-spacing:1px;"
+                        f"text-transform:uppercase;margin-bottom:4px;'>"
+                        f"📉 Worst Stock · {_worst_sector}</div>"
+                        f"<div style='font-size:1.3rem;font-weight:700;color:#ff3d57;'>"
+                        f"{_sym} &nbsp;<span style='font-size:1rem;'>{_pct_fmt}</span></div>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            if _rtma_ts:
+                st.caption(f"Data as of {_rtma_ts} · Source: Alpha Vantage")
 
 
 # ─── Dynamic TTL: short when market is open, longer when closed ───────────────
