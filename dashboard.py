@@ -1233,9 +1233,12 @@ def _time_bucket(seconds: int) -> int:
 def _load_vix(_bucket: int):           # _bucket forces refresh on schedule
     return md.get_vix()
 
-@st.cache_data(ttl=60, show_spinner=False)   # always expire after 60 s — guarantees fresh data on every auto-refresh
 def _load_heatmap():
-    return md.get_heatmap_data()
+    # Only fetch on real page load — session_state persists through auto-refresh
+    # reruns but is cleared when the user refreshes the browser.
+    if "heatmap_data" not in st.session_state:
+        st.session_state.heatmap_data = md.get_heatmap_data()
+    return st.session_state.heatmap_data
 
 
 # ─── VIX Score box ────────────────────────────────────────────────────────────
