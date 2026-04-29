@@ -1222,12 +1222,12 @@ _render_ticker(_ticker_items)
 
 def _fetch_rtma_data() -> dict | None:
     """
-    Fresh sector + stock % change data via yfinance sector ETFs (XLK, XLF …).
-    Returns the full heatmap dict {sectors:[…], stocks:{…}} or None on failure.
-    AV SECTOR endpoint is premium-only so we use live ETF prices instead.
+    Fresh sector + stock % change data via yf.Ticker.fast_info (real-time tick).
+    Returns the full dict {sectors:[…], stocks:{…}} or None on failure.
+    Uses get_sector_realtime() which bypasses all download caches.
     """
     try:
-        data = md.get_heatmap_data()   # always fetches fresh — bypasses session cache
+        data = md.get_sector_realtime()   # fast_info — reflects current tick
         if data and data.get("sectors"):
             return data
         return None
