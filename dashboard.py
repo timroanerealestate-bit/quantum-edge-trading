@@ -1233,8 +1233,8 @@ def _time_bucket(seconds: int) -> int:
 def _load_vix(_bucket: int):           # _bucket forces refresh on schedule
     return md.get_vix()
 
-@st.cache_data(show_spinner=False)
-def _load_heatmap(_bucket: int):
+@st.cache_data(ttl=60, show_spinner=False)   # always expire after 60 s — guarantees fresh data on every auto-refresh
+def _load_heatmap():
     return md.get_heatmap_data()
 
 
@@ -1324,7 +1324,7 @@ st.markdown(f"""
 
 # ─── Market heat map ──────────────────────────────────────────────────────────
 with st.spinner("Loading market heat map…"):
-    _heatmap_data = _load_heatmap(_time_bucket(_heatmap_ttl()))
+    _heatmap_data = _load_heatmap()
 
 st.markdown(
     "<div style='font-size:13px;font-weight:600;letter-spacing:1.5px;"
