@@ -20,9 +20,9 @@ SEC_HEADERS = {"User-Agent": "TrainingBot research@trainingbot.local"}
 
 # Watchlist — symbols to scan by default
 DEFAULT_WATCHLIST = [
-    "AAPL", "MSFT", "NVDA", "GOOGL", "META",
-    "AMZN", "TSLA", "JPM", "GS", "BAC",
-    "XOM", "CVX", "UNH", "LLY", "V",
+    "ACHR", "AG",   "CLOV", "GLD",  "IBIT",
+    "JOBY", "LCID", "LMND", "PLNH", "PLTR",
+    "SPY",  "TSLA", "USAR",
 ]
 
 # Signal weights (must sum to 1.0)
