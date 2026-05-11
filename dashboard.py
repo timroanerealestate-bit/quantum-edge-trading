@@ -22,6 +22,15 @@ import chart_utils as cu
 import ai_adviser as adviser
 import market_data as md
 from options_analyzer import summarize_options
+import portfolio as pf
+import alerts as al
+import chart_analyst as ca
+
+try:
+    from streamlit_autorefresh import st_autorefresh as _st_autorefresh
+    _HAS_AUTOREFRESH = True
+except ImportError:
+    _HAS_AUTOREFRESH = False
 
 # ─── CSS: Quantum Edge — Charcoal / Emerald / Purple premium theme ───────────
 st.markdown("""
@@ -738,10 +747,43 @@ _STATE_DEFAULTS = {
     "ui_rejected":      set(),
     "ui_css_artifacts": "",
     "ui_applied":       False,
+    # Portfolio tracker
+    "portfolio_trades": pf.load_portfolio(),
+    # Alerts
+    "alert_history":    al.load_alert_history(),
+    "unread_alerts":    [],
+    "alert_config": {
+        "score_threshold": 75,
+        "rsi_oversold":    30.0,
+        "macd_crossover":  True,
+        "strong_buy_only": False,
+        "email_enabled":   False,
+        "smtp_host":       "smtp.gmail.com",
+        "smtp_port":       587,
+        "smtp_user":       "",
+        "smtp_pass":       "",
+        "smtp_recipient":  "",
+    },
+    # Auto-refresh
+    "auto_refresh_on":       False,
+    "auto_refresh_interval": 60,
+    # Chart Analyst
+    "analyst_strategy":  None,
+    "analyst_images":    [],   # list of (bytes, mime_type)
+    "analyst_analysis":  None,
+    "analyst_sessions":  [],   # history of past analyses this session
 }
 for _k, _v in _STATE_DEFAULTS.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
+
+# ─── Auto-refresh ─────────────────────────────────────────────────────────────
+if _HAS_AUTOREFRESH and st.session_state.auto_refresh_on:
+    _st_autorefresh(
+        interval=st.session_state.auto_refresh_interval * 1000,
+        limit=None,
+        key="dashboard_autorefresh",
+    )
 
 
 # ─── Header banner ────────────────────────────────────────────────────────────
@@ -869,6 +911,30 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+# ─── Unread alert banner ──────────────────────────────────────────────────────
+if st.session_state.unread_alerts:
+    _ua = st.session_state.unread_alerts
+    _syms = ", ".join(a["symbol"] for a in _ua[:5])
+    _more = f" +{len(_ua)-5} more" if len(_ua) > 5 else ""
+    st.markdown(
+        f"""
+<div style="background:rgba(255,193,7,0.08);border:1px solid rgba(255,193,7,0.35);
+            border-left:4px solid #ffc107;border-radius:10px;
+            padding:14px 20px;margin-bottom:12px;
+            display:flex;align-items:center;justify-content:space-between;">
+  <div>
+    <span style="font-size:13px;font-weight:700;color:#ffc107;">
+      🔔 {len(_ua)} new alert{"s" if len(_ua)>1 else ""}
+    </span>
+    <span style="font-size:12px;color:rgba(255,255,255,0.55);margin-left:12px;">
+      {_syms}{_more}
+    </span>
+  </div>
+  <span style="font-size:11px;color:rgba(255,255,255,0.3);">See Alerts tab →</span>
+</div>""",
+        unsafe_allow_html=True,
+    )
 
 # ─── Market heat map ──────────────────────────────────────────────────────────
 with st.spinner("Loading market heat map…"):
@@ -1039,6 +1105,62 @@ with st.sidebar:
 
     st.divider()
 
+    # ── Auto-refresh ──────────────────────────────────────────────────────────
+    st.markdown("### ⏱ Auto-Refresh")
+    _ar_on = st.toggle(
+        "Auto-refresh dashboard",
+        value=st.session_state.auto_refresh_on,
+        key="ar_toggle",
+    )
+    st.session_state.auto_refresh_on = _ar_on
+    if _ar_on:
+        _ar_opts = {30: "30 s", 60: "1 min", 120: "2 min", 300: "5 min"}
+        _ar_sel = st.selectbox(
+            "Interval",
+            options=list(_ar_opts.keys()),
+            index=list(_ar_opts.keys()).index(
+                st.session_state.auto_refresh_interval
+                if st.session_state.auto_refresh_interval in _ar_opts else 60
+            ),
+            format_func=lambda x: _ar_opts[x],
+            key="ar_interval_sel",
+        )
+        st.session_state.auto_refresh_interval = _ar_sel
+        if not _HAS_AUTOREFRESH:
+            st.caption("⚠ Run `pip install streamlit-autorefresh` to enable.")
+        else:
+            st.caption(f"🟢 Refreshing every {_ar_opts[_ar_sel]}")
+
+    st.divider()
+
+    # ── Alert thresholds ──────────────────────────────────────────────────────
+    st.markdown("### 🔔 Alert Settings")
+    _ac = st.session_state.alert_config
+    _ac["score_threshold"] = st.slider(
+        "Score threshold", 50, 95,
+        int(_ac.get("score_threshold", 75)), step=5, key="al_thresh"
+    )
+    _ac["rsi_oversold"] = st.slider(
+        "RSI oversold", 20.0, 45.0,
+        float(_ac.get("rsi_oversold", 30.0)), step=1.0, key="al_rsi"
+    )
+    _ac["macd_crossover"]  = st.toggle("Alert on MACD crossover",
+                                        value=_ac.get("macd_crossover", True), key="al_macd")
+    _ac["strong_buy_only"] = st.toggle("Strong Buy only",
+                                        value=_ac.get("strong_buy_only", False), key="al_sb")
+
+    if st.session_state.unread_alerts:
+        if st.button(
+            f"✅ Mark {len(st.session_state.unread_alerts)} alert(s) read",
+            key="clear_alerts_btn", width="stretch",
+        ):
+            for _a in st.session_state.unread_alerts:
+                _a["read"] = True
+            st.session_state.unread_alerts = []
+            st.rerun()
+
+    st.divider()
+
     # ── Sidebar quick-view ────────────────────────────────────────────────────
     if st.session_state.scan_results:
         st.markdown("### 🏆 Top Results")
@@ -1081,6 +1203,26 @@ if scan_btn and watchlist:
     if results_buf:
         st.session_state.selected_symbol = results_buf[0]["symbol"]
 
+    # ── Check alerts ──────────────────────────────────────────────────────────
+    _new_alerts = al.check_alerts(results_buf, st.session_state.alert_config)
+    if _new_alerts:
+        st.session_state.unread_alerts.extend(_new_alerts)
+        _full_hist = st.session_state.alert_history + _new_alerts
+        al.save_alert_history(_full_hist)
+        st.session_state.alert_history = _full_hist[-500:]
+        # Optional email
+        _ac2 = st.session_state.alert_config
+        if _ac2.get("email_enabled") and _ac2.get("smtp_user"):
+            _ok, _err = al.send_email(_new_alerts, {
+                "host":      _ac2["smtp_host"],
+                "port":      _ac2["smtp_port"],
+                "user":      _ac2["smtp_user"],
+                "password":  _ac2["smtp_pass"],
+                "recipient": _ac2["smtp_recipient"] or _ac2["smtp_user"],
+            })
+            if not _ok:
+                st.warning(f"Email alert failed: {_err}")
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HEADER + SUMMARY METRICS
@@ -1110,12 +1252,15 @@ st.divider()
 # ═══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ═══════════════════════════════════════════════════════════════════════════════
-tab_ai, tab_results, tab_whale, tab_news, tab_charts, tab_ui = st.tabs([
+tab_ai, tab_results, tab_whale, tab_news, tab_charts, tab_portfolio, tab_alerts, tab_analyst, tab_ui = st.tabs([
     "🔬  Research Agent",
     "📊  Results",
     "🐋  Whale Activity",
     "📰  Market News",
     "📈  Charts",
+    "💼  Portfolio",
+    "🔔  Alerts",
+    "📷  Chart Analyst",
     "🖌  UI Improvements",
 ])
 
@@ -1641,113 +1786,657 @@ Our scanner reads recent articles and scores sentiment from –1 (very bearish) 
 with tab_charts:
     st.markdown("### 📈 Technical Charts")
 
-    if not results:
-        st.info("Run a scan to enable charting.")
-    else:
-        sym_opts = [r["symbol"] for r in results]
-        default_idx = (
-            sym_opts.index(st.session_state.selected_symbol)
-            if st.session_state.selected_symbol in sym_opts else 0
+    # Allow charting any symbol, not just scan results
+    _all_syms = [r["symbol"] for r in results] if results else []
+    _default_idx = (
+        _all_syms.index(st.session_state.selected_symbol)
+        if st.session_state.selected_symbol in _all_syms else 0
+    )
+
+    _cc1, _cc2, _cc3 = st.columns([2, 1, 3])
+    with _cc1:
+        _chart_sym_input = st.text_input(
+            "Symbol", value=st.session_state.selected_symbol or "AAPL",
+            placeholder="e.g. NVDA", key="chart_sym_input",
+        ).strip().upper()
+    with _cc2:
+        chart_period = st.selectbox("Period", ["1mo", "3mo", "6mo", "1y", "2y"], index=1,
+                                    key="chart_period_sel")
+    with _cc3:
+        _indicators = st.multiselect(
+            "Overlays / extra charts",
+            ["VWAP + EMA", "Bollinger Bands", "Volume Profile"],
+            default=[],
+            key="chart_indicators",
         )
 
-        ch_col1, ch_col2 = st.columns([2, 1])
-        with ch_col1:
-            chart_sym = st.selectbox(
-                "Symbol to chart", sym_opts, index=default_idx, key="chart_sel"
-            )
-        with ch_col2:
-            chart_period = st.selectbox("Period", ["1mo", "3mo", "6mo", "1y"], index=1)
+    chart_sym = _chart_sym_input or "AAPL"
 
-        # Main candlestick
+    # ── Main price chart ──────────────────────────────────────────────────────
+    if "VWAP + EMA" in _indicators:
         st.plotly_chart(
-            cu.candlestick_chart(chart_sym, chart_period), width='stretch',
+            cu.candlestick_with_vwap(chart_sym, chart_period), width="stretch",
+            key=f"chart_vwap_{chart_sym}_{chart_period}",
+        )
+    else:
+        st.plotly_chart(
+            cu.candlestick_chart(chart_sym, chart_period), width="stretch",
             key=f"chart_candle_{chart_sym}_{chart_period}",
         )
 
-        # RSI + MACD side by side
-        ind1, ind2 = st.columns(2)
-        with ind1:
-            st.plotly_chart(
-                cu.rsi_chart(chart_sym, chart_period), width='stretch',
-                key=f"chart_rsi_{chart_sym}_{chart_period}",
-            )
-        with ind2:
-            st.plotly_chart(
-                cu.macd_chart(chart_sym, chart_period), width='stretch',
-                key=f"chart_macd_{chart_sym}_{chart_period}",
-            )
+    # ── RSI + MACD ────────────────────────────────────────────────────────────
+    ind1, ind2 = st.columns(2)
+    with ind1:
+        st.plotly_chart(
+            cu.rsi_chart(chart_sym, chart_period), width="stretch",
+            key=f"chart_rsi_{chart_sym}_{chart_period}",
+        )
+    with ind2:
+        st.plotly_chart(
+            cu.macd_chart(chart_sym, chart_period), width="stretch",
+            key=f"chart_macd_{chart_sym}_{chart_period}",
+        )
 
-        # Signal breakdown
-        st.divider()
-        chart_r = next((r for r in results if r["symbol"] == chart_sym), None)
-        if chart_r:
-            if simple:
-                st.markdown("### 📖 What Do These Charts Mean?")
-                tech = chart_r.get("tech", {})
-                rsi  = tech.get("rsi")
-                macd = tech.get("macd_signal", "")
-                trend = tech.get("trend_direction", "")
+    # ── Bollinger Bands ───────────────────────────────────────────────────────
+    if "Bollinger Bands" in _indicators:
+        st.plotly_chart(
+            cu.bollinger_chart(chart_sym, chart_period), width="stretch",
+            key=f"chart_bb_{chart_sym}_{chart_period}",
+        )
 
-                explanations = []
-                if rsi:
-                    if rsi < 35:
-                        explanations.append(
-                            f"📉 **RSI {rsi:.0f}** — This stock is oversold. "
-                            "Think of it like a rubber band stretched too far — it often snaps back up."
-                        )
-                    elif rsi > 70:
-                        explanations.append(
-                            f"📈 **RSI {rsi:.0f}** — This stock is overbought. "
-                            "It's been rising fast and may need to cool down first."
-                        )
-                    else:
-                        explanations.append(f"⚪ **RSI {rsi:.0f}** — Normal momentum range (between 35 and 70).")
+    # ── Volume Profile ────────────────────────────────────────────────────────
+    if "Volume Profile" in _indicators:
+        st.plotly_chart(
+            cu.volume_profile_chart(chart_sym, chart_period), width="stretch",
+            key=f"chart_vp_{chart_sym}_{chart_period}",
+        )
 
-                macd_labels = {
-                    "bullish":       "✅ **MACD** — Momentum is building upward — buyers are in control.",
-                    "crossing_up":   "🚀 **MACD** — A crossover is happening! This is often a buy signal.",
-                    "strengthening": "📈 **MACD** — Momentum is growing stronger.",
-                    "bearish":       "⚠️ **MACD** — Momentum is pointing down — sellers are in control.",
-                    "neutral":       "⚪ **MACD** — No clear direction yet.",
-                }
-                if macd in macd_labels:
-                    explanations.append(macd_labels[macd])
+    # ── Signal breakdown (from scan results if available) ─────────────────────
+    st.divider()
+    chart_r = next((r for r in results if r["symbol"] == chart_sym), None)
+    if chart_r:
+        if simple:
+            st.markdown("### 📖 What Do These Charts Mean?")
+            tech  = chart_r.get("tech", {})
+            rsi   = tech.get("rsi")
+            macd  = tech.get("macd_signal", "")
+            trend = tech.get("trend_direction", "")
 
-                if trend == "bullish":
-                    explanations.append("📊 **Trend** — Price is above its 20-day average. The overall direction is UP.")
-                elif trend == "bearish":
-                    explanations.append("📊 **Trend** — Price is below its 20-day average. The overall direction is DOWN.")
-
-                for exp in explanations:
-                    st.markdown(f"• {exp}")
-
-            else:
-                cr1, cr2 = st.columns(2)
-                with cr1:
-                    st.plotly_chart(
-                        cu.score_radar(chart_r["scores"], chart_sym), width='stretch',
-                        key=f"chart_radar_{chart_sym}",
+            explanations = []
+            if rsi:
+                if rsi < 35:
+                    explanations.append(
+                        f"📉 **RSI {rsi:.0f}** — This stock is oversold. "
+                        "Think of it like a rubber band stretched too far — it often snaps back up."
                     )
-                with cr2:
-                    st.markdown("**Signal Details**")
-                    for d in chart_r["tech"].get("details", []):
+                elif rsi > 70:
+                    explanations.append(
+                        f"📈 **RSI {rsi:.0f}** — This stock is overbought. "
+                        "It's been rising fast and may need to cool down first."
+                    )
+                else:
+                    explanations.append(f"⚪ **RSI {rsi:.0f}** — Normal momentum range (between 35 and 70).")
+
+            macd_labels = {
+                "bullish":       "✅ **MACD** — Momentum is building upward — buyers are in control.",
+                "crossing_up":   "🚀 **MACD** — A crossover is happening! This is often a buy signal.",
+                "strengthening": "📈 **MACD** — Momentum is growing stronger.",
+                "bearish":       "⚠️ **MACD** — Momentum is pointing down — sellers are in control.",
+                "neutral":       "⚪ **MACD** — No clear direction yet.",
+            }
+            if macd in macd_labels:
+                explanations.append(macd_labels[macd])
+
+            if trend == "bullish":
+                explanations.append("📊 **Trend** — Price is above its 20-day average. The overall direction is UP.")
+            elif trend == "bearish":
+                explanations.append("📊 **Trend** — Price is below its 20-day average. The overall direction is DOWN.")
+
+            for exp in explanations:
+                st.markdown(f"• {exp}")
+        else:
+            cr1, cr2 = st.columns(2)
+            with cr1:
+                st.plotly_chart(
+                    cu.score_radar(chart_r["scores"], chart_sym), width="stretch",
+                    key=f"chart_radar_{chart_sym}",
+                )
+            with cr2:
+                st.markdown("**Signal Details**")
+                for d in chart_r["tech"].get("details", []):
+                    st.markdown(f"• {d}")
+                vol_d = chart_r.get("vol_details", [])
+                if vol_d:
+                    st.markdown("**Volume:**")
+                    for d in vol_d:
                         st.markdown(f"• {d}")
-
-                    vol_d = chart_r.get("vol_details", [])
-                    if vol_d:
-                        st.markdown("**Volume:**")
-                        for d in vol_d:
-                            st.markdown(f"• {d}")
-
-                    conv = chart_r.get("convergence_notes", [])
-                    if conv:
-                        st.markdown("**Convergence:**")
-                        for c in conv:
-                            st.info(c)
+                conv = chart_r.get("convergence_notes", [])
+                if conv:
+                    st.markdown("**Convergence:**")
+                    for c in conv:
+                        st.info(c)
+    elif not results:
+        st.caption("💡 Charts work without a scan — just type any ticker above.")
 
 
 # ════════════════════════════════════════════════════════════════════════════════
-# TAB 6 — UI IMPROVEMENTS
+# TAB 6 — PORTFOLIO TRACKER
+# ════════════════════════════════════════════════════════════════════════════════
+with tab_portfolio:
+    st.markdown("""
+<div class="command-center-header">
+    <div class="cc-title">💼 Paper Trading Portfolio</div>
+    <div class="cc-subtitle">
+        Track stocks &amp; options positions &nbsp;•&nbsp; Live P&amp;L via yfinance
+        &nbsp;•&nbsp; Saved locally to portfolio.json
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+    # ── Summary metrics ───────────────────────────────────────────────────────
+    _enriched = pf.enrich_trades(st.session_state.portfolio_trades)
+    _summary  = pf.portfolio_summary(_enriched)
+
+    _pm1, _pm2, _pm3, _pm4, _pm5 = st.columns(5)
+    _total_pnl_color = "#00d26a" if _summary["total_pnl"] >= 0 else "#ff4040"
+    _pm1.metric("Open Positions",  _summary["open_count"])
+    _pm2.metric("Closed Trades",   _summary["closed_count"])
+    _pm3.metric("Unrealized P&L",  f"${_summary['open_pnl']:+,.2f}")
+    _pm4.metric("Realized P&L",    f"${_summary['realized_pnl']:+,.2f}")
+    _pm5.metric("Win Rate",        f"{_summary['win_rate']:.0f}%")
+
+    st.divider()
+
+    # ── Add new trade form ────────────────────────────────────────────────────
+    with st.expander("➕ Add New Trade", expanded=len(st.session_state.portfolio_trades) == 0):
+        _af1, _af2, _af3 = st.columns(3)
+        with _af1:
+            _pt_sym  = st.text_input("Symbol", placeholder="NVDA", key="pt_sym").strip().upper()
+            _pt_type = st.selectbox("Type", ["Stock", "Call", "Put"], key="pt_type")
+            _pt_dir  = st.selectbox("Direction", ["Long", "Short"], key="pt_dir")
+        with _af2:
+            _pt_qty   = st.number_input("Quantity", min_value=0.01, value=1.0, step=1.0, key="pt_qty")
+            _pt_entry = st.number_input("Entry Price ($)", min_value=0.01, value=1.0, step=0.01, key="pt_entry")
+            _pt_date  = st.date_input("Entry Date", key="pt_date")
+        with _af3:
+            _pt_strike = None
+            _pt_expiry = None
+            if _pt_type in ("Call", "Put"):
+                _pt_strike = st.number_input("Strike ($)", min_value=0.01, value=100.0, step=0.50, key="pt_strike")
+                _pt_expiry = st.text_input("Expiry (YYYY-MM-DD)", placeholder="2025-06-20", key="pt_expiry")
+            _pt_notes = st.text_input("Notes (optional)", key="pt_notes")
+
+        if st.button("➕ Add Trade", type="primary", key="pt_add_btn"):
+            if _pt_sym and _pt_entry > 0 and _pt_qty > 0:
+                _trades = pf.add_trade(
+                    st.session_state.portfolio_trades,
+                    symbol=_pt_sym, trade_type=_pt_type, direction=_pt_dir,
+                    quantity=_pt_qty, entry_price=_pt_entry,
+                    entry_date=str(_pt_date),
+                    strike=_pt_strike, expiry=_pt_expiry or None,
+                    notes=_pt_notes,
+                )
+                pf.save_portfolio(_trades)
+                st.session_state.portfolio_trades = _trades
+                st.success(f"✅ Added {_pt_dir} {_pt_type} position in **{_pt_sym}**")
+                st.rerun()
+            else:
+                st.error("Fill in Symbol, Entry Price, and Quantity.")
+
+    # ── Open positions table ──────────────────────────────────────────────────
+    _open_trades = [t for t in _enriched if not t.get("closed")]
+    if _open_trades:
+        st.markdown("### 🟢 Open Positions")
+        _rows = []
+        for _t in _open_trades:
+            _pnl   = _t.get("unrealized_pnl")
+            _ppct  = _t.get("pnl_pct")
+            _live  = _t.get("live_price")
+            _rows.append({
+                "ID":         _t["id"],
+                "Symbol":     _t["symbol"],
+                "Type":       _t["trade_type"],
+                "Dir":        _t["direction"],
+                "Qty":        _t["quantity"],
+                "Entry":      f"${float(_t['entry_price']):.2f}",
+                "Live":       f"${_live:.2f}" if _live else "—",
+                "P&L $":      f"${_pnl:+,.2f}" if _pnl is not None else "—",
+                "P&L %":      f"{_ppct:+.2f}%" if _ppct is not None else "—",
+                "Date":       _t.get("entry_date", ""),
+                "Notes":      _t.get("notes", ""),
+            })
+        st.dataframe(pd.DataFrame(_rows), hide_index=True, width="stretch")
+
+        # Close / remove buttons
+        st.markdown("**Close or remove a position:**")
+        _sel_id = st.selectbox(
+            "Select trade ID", [r["ID"] for r in _rows], key="pt_sel_id"
+        )
+        _close_col, _remove_col, _exit_col = st.columns([1, 1, 2])
+        with _exit_col:
+            _exit_px = st.number_input("Exit price ($)", min_value=0.01, value=1.0,
+                                       step=0.01, key="pt_exit_px")
+        with _close_col:
+            if st.button("✅ Close Trade", key="pt_close_btn"):
+                _trades = pf.close_trade(st.session_state.portfolio_trades, _sel_id, _exit_px)
+                pf.save_portfolio(_trades)
+                st.session_state.portfolio_trades = _trades
+                st.success("Trade closed.")
+                st.rerun()
+        with _remove_col:
+            if st.button("🗑 Remove", key="pt_remove_btn"):
+                _trades = pf.remove_trade(st.session_state.portfolio_trades, _sel_id)
+                pf.save_portfolio(_trades)
+                st.session_state.portfolio_trades = _trades
+                st.rerun()
+    else:
+        st.info("No open positions yet — add a trade above.")
+
+    # ── Closed trades ─────────────────────────────────────────────────────────
+    _closed_trades = [t for t in _enriched if t.get("closed")]
+    if _closed_trades:
+        st.divider()
+        st.markdown("### 🏁 Closed Trades")
+        _crows = []
+        for _t in _closed_trades:
+            _crows.append({
+                "Symbol":  _t["symbol"],
+                "Type":    _t["trade_type"],
+                "Dir":     _t["direction"],
+                "Qty":     _t["quantity"],
+                "Entry":   f"${float(_t['entry_price']):.2f}",
+                "Exit":    f"${float(_t.get('exit_price', 0)):.2f}",
+                "P&L $":   f"${_t.get('realized_pnl', 0):+,.2f}",
+                "P&L %":   f"{_t.get('pnl_pct', 0):+.2f}%",
+                "Closed":  str(_t.get("closed_at", ""))[:10],
+            })
+        st.dataframe(pd.DataFrame(_crows), hide_index=True, width="stretch")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 7 — ALERTS
+# ════════════════════════════════════════════════════════════════════════════════
+with tab_alerts:
+    st.markdown("""
+<div class="command-center-header">
+    <div class="cc-title">🔔 Alerts &amp; Notifications</div>
+    <div class="cc-subtitle">
+        Score / RSI / MACD thresholds &nbsp;•&nbsp; Fires on every scan
+        &nbsp;•&nbsp; Optional email via SMTP
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+    # ── Unread alerts ─────────────────────────────────────────────────────────
+    _unread = st.session_state.unread_alerts
+    if _unread:
+        st.markdown(f"### 🆕 New Alerts ({len(_unread)})")
+        for _ua in _unread:
+            _ua_color = "#00d26a" if _ua["score"] >= 75 else "#ffc107"
+            st.markdown(
+                f"""<div style="background:rgba(0,210,106,0.06);border:1px solid {_ua_color}44;
+                border-left:4px solid {_ua_color};border-radius:10px;
+                padding:14px 20px;margin-bottom:8px;">
+                <b style="color:{_ua_color};font-size:15px;">{_ua['symbol']}</b>
+                <span style="color:#8892a4;font-size:12px;margin-left:8px;">{_ua['recommendation']}
+                  &nbsp;·&nbsp; Score {_ua['score']:.0f}/100 &nbsp;·&nbsp; ${_ua['price']}</span><br>
+                <span style="color:rgba(255,255,255,0.6);font-size:12px;">
+                  {"  •  ".join(_ua["reasons"])}
+                </span>
+                <div style="font-size:10px;color:rgba(255,255,255,0.2);margin-top:6px;">
+                  {_ua["fired_at"][:19]}
+                </div></div>""",
+                unsafe_allow_html=True,
+            )
+        if st.button("✅ Mark all read", key="al_mark_read_btn"):
+            st.session_state.unread_alerts = []
+            st.rerun()
+        st.divider()
+
+    # ── Email configuration ───────────────────────────────────────────────────
+    with st.expander("✉️ Email Alerts (SMTP)", expanded=False):
+        st.caption("Use Gmail App Passwords or any SMTP provider. Credentials stay local.")
+        _ac3 = st.session_state.alert_config
+        _ec1, _ec2 = st.columns(2)
+        with _ec1:
+            _ac3["smtp_host"] = st.text_input("SMTP Host", value=_ac3.get("smtp_host", "smtp.gmail.com"),
+                                               key="al_smtp_host")
+            _ac3["smtp_user"] = st.text_input("Email (sender)", value=_ac3.get("smtp_user", ""),
+                                               key="al_smtp_user")
+            _ac3["smtp_pass"] = st.text_input("App Password", value=_ac3.get("smtp_pass", ""),
+                                               type="password", key="al_smtp_pass")
+        with _ec2:
+            _ac3["smtp_port"]      = int(st.number_input("Port", value=int(_ac3.get("smtp_port", 587)),
+                                                          min_value=1, key="al_smtp_port"))
+            _ac3["smtp_recipient"] = st.text_input("Recipient email", value=_ac3.get("smtp_recipient", ""),
+                                                    key="al_smtp_recip")
+            _ac3["email_enabled"]  = st.toggle("Enable email alerts", value=_ac3.get("email_enabled", False),
+                                                key="al_email_en")
+        if st.button("🧪 Test Email", key="al_test_email"):
+            _ok, _emsg = al.send_email(
+                [{"symbol": "TEST", "score": 99, "recommendation": "STRONG BUY",
+                  "price": "100.00", "reasons": ["Test alert from Quantum Edge"]}],
+                {"host": _ac3["smtp_host"], "port": _ac3["smtp_port"],
+                 "user": _ac3["smtp_user"], "password": _ac3["smtp_pass"],
+                 "recipient": _ac3["smtp_recipient"] or _ac3["smtp_user"]},
+            )
+            if _ok:
+                st.success("✅ Test email sent!")
+            else:
+                st.error(f"Failed: {_emsg}")
+
+    st.divider()
+
+    # ── Alert history ─────────────────────────────────────────────────────────
+    _hist = st.session_state.alert_history
+    if _hist:
+        st.markdown(f"### 📜 Alert History ({len(_hist)} total)")
+        _hrows = []
+        for _ha in reversed(_hist[-100:]):
+            _hrows.append({
+                "Symbol": _ha["symbol"],
+                "Score":  f"{_ha['score']:.0f}",
+                "Rec":    _ha["recommendation"],
+                "Price":  f"${_ha['price']}",
+                "Reason": " • ".join(_ha["reasons"]),
+                "Time":   str(_ha["fired_at"])[:19],
+            })
+        st.dataframe(pd.DataFrame(_hrows), hide_index=True, width="stretch")
+
+        if st.button("🗑 Clear history", type="secondary", key="al_clear_hist"):
+            al.save_alert_history([])
+            st.session_state.alert_history = []
+            st.rerun()
+    else:
+        st.info("No alerts fired yet. Run a scan — alerts trigger automatically when thresholds are met.")
+        st.markdown("""
+**How alerts work:**
+1. Set thresholds in the sidebar (Score, RSI, MACD)
+2. Run a scan — alerts fire automatically for matching stocks
+3. A banner appears at the top of the dashboard for new alerts
+4. All alerts are stored here in history
+5. Optional: configure email above to receive notifications
+""")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 8 — CHART ANALYST  (ported from React artifact)
+# ════════════════════════════════════════════════════════════════════════════════
+with tab_analyst:
+    st.markdown("""
+<div class="command-center-header">
+    <div class="cc-title">📷 Chart Analyst</div>
+    <div class="cc-subtitle">
+        Select a strategy &nbsp;•&nbsp; Upload your chart screenshot
+        &nbsp;•&nbsp; Get an AI-powered DECISION with coaching
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+    # ── Helper: render analysis text into styled sections ─────────────────────
+    def _render_analysis(text: str):
+        HEADERS = [
+            "DECISION", "ENTRY", "TARGET",
+            "STOP / EXIT SIGNAL", "HOLD VS EXIT",
+            "TEACHING MOMENT", "NEED MORE DATA",
+        ]
+        sections = []
+        current = None
+        for raw_line in text.split("\n"):
+            line = raw_line.strip().replace("**", "")
+            if not line:
+                continue
+            matched = next((h for h in HEADERS if line.upper().startswith(h)), None)
+            if matched:
+                if current:
+                    sections.append(current)
+                current = {"header": line, "body": []}
+            elif current:
+                current["body"].append(line)
+        if current:
+            sections.append(current)
+
+        for sec in sections:
+            body = " ".join(sec["body"])
+            hdr  = sec["header"].upper()
+
+            if hdr.startswith("DECISION") or hdr.startswith("NEED MORE DATA"):
+                t = body.upper()
+                if "BUY CALL" in t:
+                    bg, border, color = "rgba(0,210,106,0.07)", "#00d26a", "#00d26a"
+                    icon = "📈"
+                elif "BUY PUT" in t:
+                    bg, border, color = "rgba(255,64,64,0.07)", "#ff4040", "#ff4040"
+                    icon = "📉"
+                elif "NO TRADE" in t:
+                    bg, border, color = "rgba(136,146,164,0.07)", "#8892a4", "#8892a4"
+                    icon = "⏸️"
+                else:
+                    bg, border, color = "rgba(245,166,35,0.07)", "#ffc107", "#ffc107"
+                    icon = "⚠️"
+                st.markdown(
+                    f"<div style='background:{bg};border:1.5px solid {border};"
+                    f"border-radius:10px;padding:14px 18px;margin-bottom:14px;"
+                    f"display:flex;align-items:center;gap:12px;'>"
+                    f"<span style='font-size:22px;'>{icon}</span>"
+                    f"<span style='font-weight:700;font-size:16px;color:{color};'>{body}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+            elif hdr.startswith("TEACHING"):
+                st.markdown(
+                    f"<div style='margin-bottom:12px;'>"
+                    f"<div style='font-size:11px;font-weight:600;letter-spacing:.06em;"
+                    f"color:#378add;text-transform:uppercase;margin-bottom:4px;'>{sec['header']}</div>"
+                    f"<div style='font-size:14px;line-height:1.65;color:#ddd;"
+                    f"background:#0d1a2e;padding:12px 14px;border-radius:8px;"
+                    f"border-left:3px solid #378add;'>{body}</div></div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f"<div style='margin-bottom:12px;'>"
+                    f"<div style='font-size:11px;font-weight:600;letter-spacing:.06em;"
+                    f"color:#555;text-transform:uppercase;margin-bottom:4px;'>{sec['header']}</div>"
+                    f"<div style='font-size:14px;line-height:1.65;color:#ddd;"
+                    f"background:#1a1b22;padding:10px 12px;border-radius:8px;'>{body}</div></div>",
+                    unsafe_allow_html=True,
+                )
+
+    # ── Strategy picker ───────────────────────────────────────────────────────
+    if not st.session_state.analyst_strategy:
+        st.markdown(
+            "<p style='font-size:13px;color:#8892a4;margin-bottom:14px;'>"
+            "Pick your strategy. Expand any card to learn how it works.</p>",
+            unsafe_allow_html=True,
+        )
+        _scols = st.columns(3)
+        for _si, _s in enumerate(ca.STRATEGIES):
+            with _scols[_si % 3]:
+                _border = "1.5px solid #1a7a4a" if _s["best"] else "1px solid #2f2f3a"
+                _bg     = "#13201a"             if _s["best"] else "#1a1b22"
+                st.markdown(
+                    f"<div style='background:{_bg};border:{_border};"
+                    f"border-radius:12px;padding:14px 12px;margin-bottom:4px;"
+                    f"position:relative;'>"
+                    + (
+                        "<div style='position:absolute;top:-10px;right:12px;"
+                        "background:#0d2e1a;color:#00d26a;font-size:11px;font-weight:600;"
+                        "padding:3px 10px;border-radius:20px;border:1px solid #1a7a4a;'>"
+                        "⭐ Recommended for beginners</div>"
+                        if _s["best"] else ""
+                    )
+                    + f"<div style='font-size:18px;margin-bottom:4px;'>{_s['icon']}</div>"
+                    f"<div style='font-weight:600;font-size:14px;color:#f0f0f5;"
+                    f"margin-bottom:4px;'>{_s['label']}</div>"
+                    f"<div style='font-size:12px;color:#8892a4;line-height:1.5;"
+                    f"margin-bottom:8px;'>{_s['short']}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+                with st.expander("How it works"):
+                    st.markdown(f"**How:** {_s['how']}")
+                    st.markdown(f"**Best for:** {_s['best_for']}")
+                    st.markdown(f"**Watch out:** {_s['risk']}")
+                if st.button(
+                    f"Use {_s['label']} →",
+                    key=f"use_strat_{_s['id']}",
+                    type="primary" if _s["best"] else "secondary",
+                    use_container_width=True,
+                ):
+                    st.session_state.analyst_strategy = _s["id"]
+                    st.session_state.analyst_images   = []
+                    st.session_state.analyst_analysis = None
+                    st.rerun()
+
+    else:
+        # ── Active strategy view ──────────────────────────────────────────────
+        _strat = ca.get_strategy(st.session_state.analyst_strategy)
+        _time  = ca.get_time_context()
+
+        # Strategy badge + time + change button
+        _hb1, _hb2, _hb3 = st.columns([3, 2, 1])
+        with _hb1:
+            st.markdown(
+                f"<div style='background:#1a1b22;border:1px solid #2f2f3a;"
+                f"border-radius:8px;padding:8px 14px;font-size:13px;font-weight:500;"
+                f"color:#f0f0f5;display:inline-block;'>"
+                f"{_strat['icon']} {_strat['label']}</div>",
+                unsafe_allow_html=True,
+            )
+        with _hb2:
+            st.markdown(
+                f"<div style='font-size:12px;color:#8892a4;padding-top:10px;'>"
+                f"🕐 {_time}</div>",
+                unsafe_allow_html=True,
+            )
+        with _hb3:
+            if st.button("Change", key="analyst_change_strat"):
+                st.session_state.analyst_strategy = None
+                st.session_state.analyst_images   = []
+                st.session_state.analyst_analysis = None
+                st.rerun()
+
+        st.divider()
+
+        # ── Chart upload ──────────────────────────────────────────────────────
+        _uploaded = st.file_uploader(
+            "Upload chart screenshot(s)",
+            type=["png", "jpg", "jpeg", "webp"],
+            accept_multiple_files=True,
+            key="analyst_uploader",
+            help="Upload one or more chart timeframes for a more complete read",
+        )
+
+        if _uploaded:
+            _new_images = []
+            for _f in _uploaded:
+                _raw  = _f.read()
+                _mime = _f.type or "image/png"
+                _new_images.append((_raw, _mime))
+            st.session_state.analyst_images = _new_images
+
+        # Thumbnail preview
+        if st.session_state.analyst_images:
+            st.markdown(
+                f"<div style='font-size:12px;color:#8892a4;margin:8px 0 4px;'>"
+                f"{len(st.session_state.analyst_images)} chart"
+                f"{'s' if len(st.session_state.analyst_images)>1 else ''} loaded</div>",
+                unsafe_allow_html=True,
+            )
+            _tcols = st.columns(min(len(st.session_state.analyst_images), 6))
+            for _ti, (_raw, _mime) in enumerate(st.session_state.analyst_images):
+                import base64 as _b64
+                _b64str = _b64.b64encode(_raw).decode()
+                with _tcols[_ti]:
+                    st.markdown(
+                        f"<img src='data:{_mime};base64,{_b64str}' "
+                        f"style='width:100%;border-radius:6px;border:1px solid #2f2f3a;'>",
+                        unsafe_allow_html=True,
+                    )
+
+        st.divider()
+
+        # ── Analyze / reset buttons ───────────────────────────────────────────
+        _btn1, _btn2 = st.columns([3, 1])
+        with _btn1:
+            _analyze_btn = st.button(
+                "🔍  Analyze Chart" if not st.session_state.analyst_analysis else "🔄  Re-analyze",
+                type="primary",
+                disabled=not st.session_state.analyst_images,
+                use_container_width=True,
+                key="analyst_run_btn",
+            )
+        with _btn2:
+            if st.button("🔄 Clear & reset", use_container_width=True, key="analyst_clear_btn"):
+                st.session_state.analyst_strategy = None
+                st.session_state.analyst_images   = []
+                st.session_state.analyst_analysis = None
+                st.rerun()
+
+        if _analyze_btn and st.session_state.analyst_images:
+            with st.spinner("Reading the chart…"):
+                _result = ca.analyze_chart(
+                    st.session_state.analyst_images,
+                    st.session_state.analyst_strategy,
+                )
+            st.session_state.analyst_analysis = _result
+            # Save to session history
+            st.session_state.analyst_sessions.append({
+                "strategy": _strat["label"],
+                "n_charts": len(st.session_state.analyst_images),
+                "analysis": _result,
+                "time":     _time,
+            })
+
+        # ── Analysis output ───────────────────────────────────────────────────
+        if st.session_state.analyst_analysis:
+            st.divider()
+            if st.session_state.analyst_analysis.startswith("ERROR"):
+                st.error(st.session_state.analyst_analysis)
+            else:
+                st.markdown(
+                    "<div style='background:#111318;border:1px solid #2a2b35;"
+                    "border-radius:14px;padding:20px;margin-bottom:14px;'>",
+                    unsafe_allow_html=True,
+                )
+                _render_analysis(st.session_state.analyst_analysis)
+                st.markdown("</div>", unsafe_allow_html=True)
+
+                # Add another timeframe prompt
+                st.markdown(
+                    "<div style='font-size:12px;color:#8892a4;margin-bottom:6px;'>"
+                    "Add another timeframe for a more complete read:</div>",
+                    unsafe_allow_html=True,
+                )
+                _tf_cols = st.columns(len(ca.TIMEFRAMES))
+                for _tfi, _tf in enumerate(ca.TIMEFRAMES):
+                    with _tf_cols[_tfi]:
+                        if st.button(_tf, key=f"tf_{_tf}", use_container_width=True):
+                            st.info(f"Upload a {_tf} chart using the uploader above, then click Re-analyze.")
+
+        # ── Session history (collapsed) ───────────────────────────────────────
+        if len(st.session_state.analyst_sessions) > 1:
+            with st.expander(f"📜 Session history ({len(st.session_state.analyst_sessions)} analyses)"):
+                for _hi, _h in enumerate(reversed(st.session_state.analyst_sessions)):
+                    st.markdown(f"**#{len(st.session_state.analyst_sessions)-_hi}  {_h['strategy']}** — {_h['time']} — {_h['n_charts']} chart(s)")
+                    st.caption(_h["analysis"][:200] + "…")
+                    st.divider()
+
+    # ── Disclaimer ────────────────────────────────────────────────────────────
+    st.markdown(
+        "<div style='margin-top:24px;padding:10px 14px;background:#111318;"
+        "border:1px solid #2a2b35;border-radius:8px;font-size:11px;"
+        "color:#555;line-height:1.6;'>"
+        "⚠️ <strong style='color:#666;'>Disclaimer:</strong> For educational purposes only. "
+        "Nothing here is financial advice. Options trading involves significant risk. "
+        "Always do your own research.</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 9 — UI IMPROVEMENTS
 # ════════════════════════════════════════════════════════════════════════════════
 with tab_ui:
     st.markdown("""

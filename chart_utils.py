@@ -3,6 +3,7 @@ Plotly chart builders for the Training Bot dashboard.
 Premium charcoal/emerald/purple theme — Quantum Edge Trading.
 """
 import yfinance as yf
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -545,3 +546,265 @@ def market_heatmap_chart(heatmap_data: dict) -> go.Figure:
         ),
     )
     return fig
+
+
+# ── VWAP + EMA200 candlestick ─────────────────────────────────────────────────
+def candlestick_with_vwap(symbol: str, period: str = "3mo") -> go.Figure:
+    """Candlestick with anchored VWAP, SMA20/50, and EMA200 overlays."""
+    try:
+        df = yf.Ticker(symbol).history(period=period)
+        if df.empty:
+            return _empty_fig(f"No price data for {symbol}")
+
+        df = df.copy()
+        typical = (df["High"] + df["Low"] + df["Close"]) / 3
+        df["vwap"] = (typical * df["Volume"]).cumsum() / df["Volume"].cumsum()
+
+        fig = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            row_heights=[0.72, 0.28],
+            vertical_spacing=0.02,
+        )
+
+        fig.add_trace(go.Candlestick(
+            x=df.index,
+            open=df["Open"], high=df["High"],
+            low=df["Low"],   close=df["Close"],
+            name=symbol,
+            increasing=dict(line=dict(color=C_BULL, width=1), fillcolor=C_BULL),
+            decreasing=dict(line=dict(color=C_BEAR, width=1), fillcolor=C_BEAR),
+        ), row=1, col=1)
+
+        closes = df["Close"]
+
+        if len(df) >= 20:
+            fig.add_trace(go.Scatter(
+                x=df.index, y=closes.rolling(20).mean(),
+                name="SMA 20", line=dict(color=C_CYAN, width=1.6),
+                opacity=0.8,
+            ), row=1, col=1)
+
+        if len(df) >= 50:
+            fig.add_trace(go.Scatter(
+                x=df.index, y=closes.rolling(50).mean(),
+                name="SMA 50", line=dict(color=C_AMBER, width=1.6, dash="dot"),
+                opacity=0.7,
+            ), row=1, col=1)
+
+        # EMA 200 (or as many bars as we have)
+        ema_span = min(200, max(20, len(df) // 2))
+        fig.add_trace(go.Scatter(
+            x=df.index, y=closes.ewm(span=ema_span, adjust=False).mean(),
+            name=f"EMA {ema_span}", line=dict(color=C_VIOLET, width=1.4, dash="dash"),
+            opacity=0.65,
+        ), row=1, col=1)
+
+        # VWAP — orange
+        fig.add_trace(go.Scatter(
+            x=df.index, y=df["vwap"],
+            name="VWAP", line=dict(color="#ff9500", width=2.2),
+            opacity=0.9,
+        ), row=1, col=1)
+
+        bar_colors = [
+            "rgba(0,210,106,0.55)" if c >= o else "rgba(255,64,64,0.55)"
+            for c, o in zip(df["Close"], df["Open"])
+        ]
+        fig.add_trace(go.Bar(
+            x=df.index, y=df["Volume"],
+            name="Volume", marker_color=bar_colors, showlegend=False,
+        ), row=2, col=1)
+
+        fig.update_layout(
+            **_dark_layout(
+                title=dict(
+                    text=f"<b>{symbol}</b>  •  Price + VWAP + EMA ({period})",
+                    font=dict(size=15, color=C_TEXT), x=0.01,
+                ),
+                height=520,
+                xaxis_rangeslider_visible=False,
+                hovermode="x unified",
+            )
+        )
+        fig.update_yaxes(title_text="Price ($)", row=1, col=1,
+                         title_font=dict(color=C_MUTED, size=11))
+        fig.update_yaxes(title_text="Volume",    row=2, col=1,
+                         title_font=dict(color=C_MUTED, size=11))
+        return fig
+
+    except Exception as e:
+        return _empty_fig(f"VWAP chart error: {e}")
+
+
+# ── Bollinger Bands chart ─────────────────────────────────────────────────────
+def bollinger_chart(symbol: str, period: str = "3mo") -> go.Figure:
+    """Bollinger Bands (20, 2σ) with price line and bandwidth oscillator."""
+    try:
+        if not HAS_TA:
+            return _empty_fig("Install 'ta' library for Bollinger Bands")
+
+        df = yf.Ticker(symbol).history(period=period)
+        if df.empty:
+            return _empty_fig(f"No data for {symbol}")
+
+        bb     = ta.volatility.BollingerBands(df["Close"], window=20, window_dev=2)
+        upper  = bb.bollinger_hband()
+        lower  = bb.bollinger_lband()
+        mid    = bb.bollinger_mavg()
+        bw     = (upper - lower) / mid * 100  # bandwidth %
+
+        fig = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            row_heights=[0.65, 0.35],
+            vertical_spacing=0.03,
+        )
+
+        # Band fill
+        x_fill = pd.concat([df.index.to_series(), df.index.to_series().iloc[::-1]])
+        y_fill = pd.concat([upper, lower.iloc[::-1]])
+        fig.add_trace(go.Scatter(
+            x=x_fill, y=y_fill,
+            fill="toself",
+            fillcolor="rgba(139,86,246,0.07)",
+            line=dict(color="rgba(0,0,0,0)"),
+            showlegend=False,
+        ), row=1, col=1)
+
+        for band, col, nm, dash in [
+            (upper, C_VIOLET, "Upper (2σ)", "dash"),
+            (lower, C_BEAR,   "Lower (2σ)", "dash"),
+            (mid,   C_AMBER,  "Mid (SMA20)", "dot"),
+        ]:
+            fig.add_trace(go.Scatter(
+                x=df.index, y=band, name=nm,
+                line=dict(color=col, width=1.5, dash=dash), opacity=0.8,
+            ), row=1, col=1)
+
+        fig.add_trace(go.Scatter(
+            x=df.index, y=df["Close"],
+            name="Close", line=dict(color=C_CYAN, width=2),
+        ), row=1, col=1)
+
+        fig.add_trace(go.Scatter(
+            x=df.index, y=bw,
+            name="Bandwidth %",
+            line=dict(color=C_AMBER, width=1.8),
+            fill="tozeroy", fillcolor="rgba(255,193,7,0.05)",
+        ), row=2, col=1)
+
+        fig.update_layout(
+            **_dark_layout(
+                title=dict(
+                    text=f"<b>{symbol}</b>  •  Bollinger Bands (20, 2σ)",
+                    font=dict(size=14, color=C_TEXT), x=0.01,
+                ),
+                height=460,
+                hovermode="x unified",
+            )
+        )
+        fig.update_yaxes(title_text="Price ($)",   row=1, col=1,
+                         title_font=dict(color=C_MUTED, size=11))
+        fig.update_yaxes(title_text="Bandwidth %", row=2, col=1,
+                         title_font=dict(color=C_MUTED, size=11))
+        return fig
+
+    except Exception as e:
+        return _empty_fig(f"Bollinger error: {e}")
+
+
+# ── Volume Profile chart ──────────────────────────────────────────────────────
+def volume_profile_chart(symbol: str, period: str = "3mo", bins: int = 30) -> go.Figure:
+    """
+    Volume Profile — horizontal bar chart of volume distribution by price.
+    Yellow bar = Point of Control (highest volume).
+    Purple bars = Value Area (70% of total volume around POC).
+    """
+    try:
+        df = yf.Ticker(symbol).history(period=period)
+        if df.empty:
+            return _empty_fig(f"No data for {symbol}")
+
+        price_min = float(df["Low"].min())
+        price_max = float(df["High"].max())
+        edges = [price_min + (price_max - price_min) * i / bins for i in range(bins + 1)]
+
+        vol_at_price = [0.0] * bins
+        for _, row in df.iterrows():
+            lo, hi, vol = float(row["Low"]), float(row["High"]), float(row["Volume"])
+            span = hi - lo if hi > lo else 1.0
+            for j in range(bins):
+                overlap = max(0.0, min(hi, edges[j + 1]) - max(lo, edges[j]))
+                vol_at_price[j] += vol * (overlap / span)
+
+        centers   = [(edges[j] + edges[j + 1]) / 2 for j in range(bins)]
+        total_vol = sum(vol_at_price)
+        poc_idx   = vol_at_price.index(max(vol_at_price))
+
+        # Value area — 70 % of volume expanding from POC outward
+        va_indices: set[int] = {poc_idx}
+        lo_i, hi_i = poc_idx, poc_idx
+        while sum(vol_at_price[i] for i in va_indices) / max(total_vol, 1) < 0.70:
+            if lo_i > 0:        lo_i -= 1
+            if hi_i < bins - 1: hi_i += 1
+            va_indices.update(range(lo_i, hi_i + 1))
+            if lo_i == 0 and hi_i == bins - 1:
+                break
+
+        bar_colors = [
+            "#ffc107"                     if j == poc_idx else
+            "rgba(139,86,246,0.60)"       if j in va_indices else
+            "rgba(0,210,106,0.35)"
+            for j in range(bins)
+        ]
+
+        max_vol = max(vol_at_price) or 1
+        rel_vol = [v / max_vol * 100 for v in vol_at_price]
+        current_price = float(df["Close"].iloc[-1])
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=rel_vol,
+            y=centers,
+            orientation="h",
+            marker_color=bar_colors,
+            name="Volume Profile",
+            hovertemplate="Price: $%{y:.2f}<br>Relative Vol: %{x:.1f}%<extra></extra>",
+        ))
+
+        fig.add_hline(
+            y=current_price, line_dash="dash", line_color=C_CYAN, line_width=2,
+            annotation_text=f"  ${current_price:.2f}",
+            annotation_font=dict(color=C_CYAN, size=11),
+            annotation_position="right",
+        )
+        fig.add_hline(
+            y=centers[poc_idx], line_dash="dot", line_color="#ffc107", line_width=1.5,
+            annotation_text="  POC",
+            annotation_font=dict(color="#ffc107", size=10),
+            annotation_position="left",
+        )
+
+        fig.update_layout(
+            **_dark_layout(
+                title=dict(
+                    text=(
+                        f"<b>{symbol}</b>  •  Volume Profile ({period})  "
+                        "<span style='font-size:11px;color:#8892a4;'>"
+                        "🟡 POC  🟣 Value Area (70%)</span>"
+                    ),
+                    font=dict(size=14, color=C_TEXT), x=0.01,
+                ),
+                height=520,
+                xaxis=dict(title="Relative Volume %", gridcolor=C_GRID,
+                           tickfont=dict(color=C_MUTED)),
+                yaxis=dict(title="Price ($)", gridcolor=C_GRID,
+                           tickfont=dict(color=C_MUTED), tickprefix="$"),
+                bargap=0.05,
+            ),
+        )
+        return fig
+
+    except Exception as e:
+        return _empty_fig(f"Volume profile error: {e}")

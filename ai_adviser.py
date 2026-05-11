@@ -22,9 +22,11 @@ import time
 import requests
 import yfinance as yf
 import pandas as pd
-from dotenv import load_dotenv
-
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 def _get_secret(key: str) -> str:
     """Read from Streamlit secrets (Cloud) with fallback to .env (local)."""
