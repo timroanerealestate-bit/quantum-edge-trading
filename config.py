@@ -1,7 +1,29 @@
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# ── Local .env support (optional — not available on Streamlit Cloud) ───────────
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+# ── Streamlit Cloud: pull secrets into os.environ ─────────────────────────────
+def _load_cloud_secrets() -> None:
+    """If running on Streamlit Cloud, copy st.secrets → os.environ."""
+    try:
+        import streamlit as st
+        _keys = [
+            "GROQ_API_KEY", "ALPHA_VANTAGE_API_KEY",
+            "MARKETAUX_API_TOKEN", "ANTHROPIC_API_KEY",
+            "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "FINNHUB_API_KEY",
+        ]
+        for k in _keys:
+            if k in st.secrets and not os.getenv(k):
+                os.environ[k] = str(st.secrets[k])
+    except Exception:
+        pass
+
+_load_cloud_secrets()
 
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY", "")
 ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query"

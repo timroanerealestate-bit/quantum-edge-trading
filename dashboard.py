@@ -26,6 +26,9 @@ import market_data as md
 from options_analyzer import summarize_options
 import news_ticker as nt
 from streamlit_autorefresh import st_autorefresh
+import portfolio as pf
+import alerts as al
+import chart_analyst as ca
 
 # ─── API Key resolution ───────────────────────────────────────────────────────
 # Priority: st.secrets (Streamlit Cloud / local secrets.toml) → os.environ
@@ -1120,13 +1123,29 @@ div[data-baseweb="notification"] { border-radius: 14px !important; }
 
 # ─── Session state defaults ────────────────────────────────────────────────────
 _STATE_DEFAULTS = {
-    "scan_results":    [],
-    "last_scan_time":  None,
-    "chat_history":    [],
-    "selected_symbol": None,
-    "options_cache":   {},
-    "simple_mode":     False,
-    "pending_q":       "",
+    "scan_results":       [],
+    "last_scan_time":     None,
+    "chat_history":       [],
+    "selected_symbol":    None,
+    "options_cache":      {},
+    "simple_mode":        False,
+    "pending_q":          "",
+    # Portfolio
+    "portfolio_trades":   pf.load_portfolio(),
+    # Alerts
+    "alert_history":      al.load_alert_history(),
+    "unread_alerts":      [],
+    "alert_config":       {
+        "score_threshold":  75,
+        "rsi_oversold":     30,
+        "macd_crossover":   True,
+        "strong_buy_only":  False,
+    },
+    # Chart Analyst
+    "analyst_strategy":   "trend",
+    "analyst_images":     [],
+    "analyst_analysis":   "",
+    "analyst_sessions":   [],
 }
 for _k, _v in _STATE_DEFAULTS.items():
     if _k not in st.session_state:
@@ -1712,12 +1731,15 @@ st.divider()
 # ═══════════════════════════════════════════════════════════════════════════════
 # TABS
 # ═══════════════════════════════════════════════════════════════════════════════
-tab_ai, tab_results, tab_whale, tab_news, tab_charts = st.tabs([
+tab_ai, tab_results, tab_whale, tab_news, tab_charts, tab_portfolio, tab_alerts, tab_analyst = st.tabs([
     "🔬  Research Agent",
     "📊  Results",
     "🐋  Whale Activity",
     "📰  Market News",
     "📈  Charts",
+    "💼  Portfolio",
+    "🔔  Alerts",
+    "📷  Chart Analyst",
 ])
 
 
@@ -2340,4 +2362,303 @@ with tab_charts:
                             st.info(c)
 
 
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 6 — PORTFOLIO TRACKER
+# ════════════════════════════════════════════════════════════════════════════════
+with tab_portfolio:
+    st.markdown("### 💼 Paper Trading Portfolio")
 
+    # ── Add Trade Form ────────────────────────────────────────────────────────
+    with st.expander("➕ Add New Trade", expanded=False):
+        pc1, pc2, pc3 = st.columns(3)
+        with pc1:
+            p_sym    = st.text_input("Symbol", placeholder="e.g. TSLA", key="p_sym").upper().strip()
+            p_side   = st.selectbox("Direction", ["Long", "Short"], key="p_side")
+            p_type   = st.selectbox("Trade Type", ["Stock", "Call", "Put"], key="p_type")
+        with pc2:
+            p_entry  = st.number_input("Entry Price ($)", min_value=0.01, value=1.00, step=0.01, key="p_entry")
+            p_qty    = st.number_input("Qty / Contracts", min_value=1, value=1, step=1, key="p_qty")
+        with pc3:
+            p_strike = st.number_input("Strike ($)", min_value=0.0, value=0.0, step=1.0, key="p_strike") if p_type in ("Call", "Put") else 0.0
+            p_expiry = st.text_input("Expiry (YYYY-MM-DD)", key="p_expiry") if p_type in ("Call", "Put") else ""
+            p_notes  = st.text_input("Notes (optional)", key="p_notes")
+
+        if st.button("Add Trade", key="p_add_btn", use_container_width=True):
+            if p_sym:
+                new_trade = pf.add_trade(
+                    st.session_state["portfolio_trades"],
+                    symbol=p_sym, side=p_side, trade_type=p_type,
+                    entry_price=p_entry, qty=p_qty,
+                    strike=p_strike, expiry=p_expiry, notes=p_notes,
+                )
+                st.session_state["portfolio_trades"] = new_trade
+                pf.save_portfolio(new_trade)
+                st.success(f"✅ Trade added: {p_sym} {p_side} {p_type}")
+                st.rerun()
+            else:
+                st.warning("Enter a symbol first.")
+
+    # ── Live Positions ────────────────────────────────────────────────────────
+    open_trades = [t for t in st.session_state["portfolio_trades"] if t.get("status") == "open"]
+    closed_trades = [t for t in st.session_state["portfolio_trades"] if t.get("status") == "closed"]
+
+    if open_trades:
+        st.markdown("#### 📊 Open Positions")
+        enriched = pf.enrich_trades(open_trades)
+        summary  = pf.portfolio_summary(enriched)
+
+        # Summary metrics
+        sm1, sm2, sm3, sm4 = st.columns(4)
+        with sm1:
+            st.metric("Total Value", f"${summary['total_value']:,.0f}")
+        with sm2:
+            color = "normal" if summary["total_pnl"] >= 0 else "inverse"
+            st.metric("Unrealized P&L", f"${summary['total_pnl']:,.0f}",
+                      delta=f"{summary['total_pnl_pct']:+.1f}%")
+        with sm3:
+            st.metric("Positions", summary["open_count"])
+        with sm4:
+            st.metric("Cost Basis", f"${summary['total_cost']:,.0f}")
+
+        # Position rows
+        for tr in enriched:
+            pnl     = tr.get("unrealized_pnl", 0.0)
+            pnl_pct = tr.get("pnl_pct", 0.0)
+            live    = tr.get("live_price", tr["entry_price"])
+            color   = "#10ffb0" if pnl >= 0 else "#ff3d57"
+
+            with st.container():
+                tc1, tc2, tc3, tc4, tc5, tc6 = st.columns([2, 1, 1, 1, 1, 1])
+                with tc1:
+                    badge = "🟢" if tr["side"] == "Long" else "🔴"
+                    st.markdown(f"**{badge} {tr['symbol']}** `{tr['trade_type']} · {tr['side']}`")
+                    if tr.get("notes"):
+                        st.caption(tr["notes"])
+                with tc2:
+                    st.caption("Entry")
+                    st.markdown(f"**${tr['entry_price']:.2f}**")
+                with tc3:
+                    st.caption("Live")
+                    st.markdown(f"**${live:.2f}**")
+                with tc4:
+                    st.caption("Qty")
+                    st.markdown(f"**{tr['qty']}**")
+                with tc5:
+                    st.caption("P&L")
+                    st.markdown(f"<span style='color:{color};font-weight:700'>${pnl:+,.0f} ({pnl_pct:+.1f}%)</span>",
+                                unsafe_allow_html=True)
+                with tc6:
+                    if st.button("Close", key=f"close_{tr['id']}", use_container_width=True):
+                        updated = pf.close_trade(st.session_state["portfolio_trades"], tr["id"], live)
+                        st.session_state["portfolio_trades"] = updated
+                        pf.save_portfolio(updated)
+                        st.success(f"Closed {tr['symbol']} at ${live:.2f}")
+                        st.rerun()
+                st.divider()
+    else:
+        st.info("No open positions. Add a trade above to start tracking.")
+
+    # ── Closed Trades ─────────────────────────────────────────────────────────
+    if closed_trades:
+        with st.expander(f"📁 Closed Trades ({len(closed_trades)})", expanded=False):
+            for tr in reversed(closed_trades):
+                realized = tr.get("realized_pnl", 0.0)
+                color    = "#10ffb0" if realized >= 0 else "#ff3d57"
+                st.markdown(
+                    f"**{tr['symbol']}** {tr['trade_type']} {tr['side']} · "
+                    f"Entry ${tr['entry_price']:.2f} → Exit ${tr.get('exit_price', 0):.2f} · "
+                    f"<span style='color:{color}'><b>${realized:+,.0f}</b></span>",
+                    unsafe_allow_html=True,
+                )
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 7 — ALERTS
+# ════════════════════════════════════════════════════════════════════════════════
+with tab_alerts:
+    st.markdown("### 🔔 Alert Center")
+
+    # ── Config ────────────────────────────────────────────────────────────────
+    with st.expander("⚙️ Alert Settings", expanded=False):
+        ac1, ac2 = st.columns(2)
+        with ac1:
+            thr = st.slider("Min Score to Alert", 50, 95,
+                            st.session_state["alert_config"]["score_threshold"], key="al_thr")
+            rsi_lv = st.slider("RSI Oversold Threshold", 20, 45,
+                               st.session_state["alert_config"]["rsi_oversold"], key="al_rsi")
+        with ac2:
+            macd_x = st.checkbox("MACD Crossover Alerts",
+                                 st.session_state["alert_config"]["macd_crossover"], key="al_macd")
+            sbo    = st.checkbox("Strong Buy Only",
+                                 st.session_state["alert_config"]["strong_buy_only"], key="al_sbo")
+        if st.button("Save Alert Config", key="al_save"):
+            st.session_state["alert_config"] = {
+                "score_threshold": thr, "rsi_oversold": rsi_lv,
+                "macd_crossover": macd_x, "strong_buy_only": sbo,
+            }
+            st.success("Alert config saved.")
+
+    # ── Unread Alerts ─────────────────────────────────────────────────────────
+    unread = st.session_state.get("unread_alerts", [])
+    if unread:
+        st.markdown(f"#### 🚨 {len(unread)} New Alert(s)")
+        for a in unread:
+            severity_color = {"high": "#ff3d57", "medium": "#f97316", "low": "#fbbf24"}.get(
+                a.get("severity", "low"), "#fbbf24"
+            )
+            st.markdown(
+                f"<div style='border-left:4px solid {severity_color};padding:8px 14px;"
+                f"margin:6px 0;background:rgba(10,12,28,0.6);border-radius:4px'>"
+                f"<b>{a['symbol']}</b> — {a['message']}</div>",
+                unsafe_allow_html=True,
+            )
+        if st.button("Mark All Read", key="al_mark_read"):
+            st.session_state["unread_alerts"] = []
+            st.rerun()
+    else:
+        st.info("No new alerts. Run a scan to trigger alert checks.")
+
+    # ── Alert History ─────────────────────────────────────────────────────────
+    history = st.session_state.get("alert_history", [])
+    if history:
+        with st.expander(f"📋 Alert History ({len(history)} entries)", expanded=False):
+            for entry in reversed(history[-50:]):
+                ts  = entry.get("timestamp", "")
+                sym = entry.get("symbol", "")
+                msg = entry.get("message", "")
+                sev = entry.get("severity", "low")
+                ic  = {"high": "🔴", "medium": "🟠", "low": "🟡"}.get(sev, "⚪")
+                st.markdown(f"{ic} `{ts[:16]}` **{sym}** — {msg}")
+    else:
+        st.caption("No alert history yet.")
+
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TAB 8 — CHART ANALYST (AI Vision)
+# ════════════════════════════════════════════════════════════════════════════════
+with tab_analyst:
+    st.markdown("### 📷 Chart Analyst — AI Options Trade Analysis")
+    st.caption("Upload chart screenshots · pick your strategy · get DECISION / ENTRY / TARGET / STOP")
+
+    # ── Strategy Picker ───────────────────────────────────────────────────────
+    st.markdown("#### 1️⃣ Choose Your Strategy")
+    strat_cols = st.columns(3)
+    for idx, strat in enumerate(ca.STRATEGIES):
+        with strat_cols[idx % 3]:
+            selected = st.session_state["analyst_strategy"] == strat["id"]
+            border   = "#00e5ff" if selected else "rgba(255,255,255,0.1)"
+            best_tag = " ⭐ RECOMMENDED" if strat.get("best") else ""
+            st.markdown(
+                f"<div style='border:2px solid {border};border-radius:10px;padding:12px;"
+                f"background:rgba(10,12,28,0.7);cursor:pointer;margin-bottom:8px'>"
+                f"<b>{strat['icon']} {strat['label']}{best_tag}</b><br>"
+                f"<span style='color:#8892b0;font-size:0.82rem'>{strat['short']}</span></div>",
+                unsafe_allow_html=True,
+            )
+            if st.button(f"Select {strat['label']}", key=f"strat_{strat['id']}", use_container_width=True):
+                st.session_state["analyst_strategy"] = strat["id"]
+                st.rerun()
+
+    # Show selected strategy details
+    sel_strat = ca.get_strategy(st.session_state["analyst_strategy"])
+    if sel_strat:
+        st.info(f"**{sel_strat['icon']} {sel_strat['label']}** — {sel_strat['how']}\n\n"
+                f"✅ **Best for:** {sel_strat['best_for']}   ⚠️ **Risk:** {sel_strat['risk']}")
+
+    st.markdown("---")
+
+    # ── Upload Charts ─────────────────────────────────────────────────────────
+    st.markdown("#### 2️⃣ Upload Chart Screenshot(s)")
+    uploaded = st.file_uploader(
+        "Drag & drop chart images (PNG, JPG, WEBP)",
+        type=["png", "jpg", "jpeg", "webp"],
+        accept_multiple_files=True,
+        key="chart_upload",
+    )
+
+    if uploaded:
+        img_cols = st.columns(min(len(uploaded), 3))
+        for i, f in enumerate(uploaded):
+            with img_cols[i % 3]:
+                st.image(f, caption=f.name, use_container_width=True)
+
+    st.markdown("---")
+
+    # ── Analyze Button ────────────────────────────────────────────────────────
+    st.markdown("#### 3️⃣ Get AI Analysis")
+    if st.button("🔍 Analyze Charts", key="analyst_run", use_container_width=True,
+                 disabled=not uploaded):
+        if not uploaded:
+            st.warning("Upload at least one chart image first.")
+        else:
+            images = [(f.read(), f.type or "image/png") for f in uploaded]
+            with st.spinner("Analyzing with Llama 4 Maverick (vision)…"):
+                analysis = ca.analyze_chart(images, st.session_state["analyst_strategy"])
+            st.session_state["analyst_analysis"] = analysis
+            # Save to session history
+            st.session_state["analyst_sessions"].insert(0, {
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "strategy":  sel_strat["label"] if sel_strat else "Unknown",
+                "analysis":  analysis,
+            })
+            st.rerun()
+
+    # ── Analysis Output ───────────────────────────────────────────────────────
+    analysis_text = st.session_state.get("analyst_analysis", "")
+    if analysis_text:
+        st.markdown("---")
+        st.markdown("#### 📋 Analysis Result")
+
+        if analysis_text.startswith("ERROR:"):
+            st.error(analysis_text)
+        else:
+            # Render each section with color-coded styling
+            section_styles = {
+                "DECISION":          ("#00e5ff", "🎯"),
+                "ENTRY":             ("#10ffb0", "💰"),
+                "TARGET":            ("#10ffb0", "🏁"),
+                "STOP":              ("#ff3d57", "🛑"),
+                "STOP / EXIT SIGNAL": ("#ff3d57", "🛑"),
+                "HOLD VS EXIT":      ("#f97316", "⏳"),
+                "TEACHING MOMENT":   ("#a855f7", "🎓"),
+            }
+            current_section = None
+            current_lines: list[str] = []
+
+            def _flush_section(sec: str, lines: list[str]) -> None:
+                if not sec:
+                    return
+                color, icon = section_styles.get(sec, ("#8892b0", "📌"))
+                content = " ".join(lines).strip()
+                st.markdown(
+                    f"<div style='border-left:4px solid {color};padding:10px 16px;"
+                    f"margin:8px 0;background:rgba(10,12,28,0.7);border-radius:6px'>"
+                    f"<b style='color:{color}'>{icon} {sec}</b><br>"
+                    f"<span style='color:#f0f4ff'>{content}</span></div>",
+                    unsafe_allow_html=True,
+                )
+
+            for line in analysis_text.split("\n"):
+                stripped = line.strip()
+                matched = False
+                for sec_key in section_styles:
+                    if stripped.upper().startswith(sec_key.upper()):
+                        _flush_section(current_section, current_lines)
+                        current_section = sec_key
+                        current_lines   = [stripped[len(sec_key):].lstrip(": ")]
+                        matched = True
+                        break
+                if not matched and stripped:
+                    current_lines.append(stripped)
+
+            _flush_section(current_section, current_lines)
+
+    # ── Session History ───────────────────────────────────────────────────────
+    sessions = st.session_state.get("analyst_sessions", [])
+    if len(sessions) > 1:
+        with st.expander(f"🕓 Previous Analyses ({len(sessions) - 1})", expanded=False):
+            for sess in sessions[1:]:
+                st.markdown(f"**{sess['timestamp']}** — {sess['strategy']}")
+                st.text_area("", sess["analysis"], height=120, key=f"hist_{sess['timestamp']}",
+                             disabled=True, label_visibility="collapsed")
+                st.divider()
